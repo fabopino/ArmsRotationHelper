@@ -1,0 +1,2131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WoW Rotation Trainer - Warrior Arms Slayer (ST & AoE)</title>
+  <style>
+    :root {
+      --bg: #090d16;
+      --card: #131b2b;
+      --accent: #c2410c;
+      --rage: #ef4444;
+      --text: #f8fafc;
+      --border: #233044;
+      --perfect: #22c55e;
+      --good: #38bdf8;
+      --late: #f59e0b;
+      --suboptimal: #eab308;
+      --error: #ef4444;
+      --channel: #a855f7;
+      --cdr: #38bdf8;
+      --queue: #f59e0b;
+      --precision: #ec4899;
+      --ss: #e11d48;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; user-select: none; }
+    body { background-color: var(--bg); color: var(--text); padding: 14px; display: flex; flex-direction: column; align-items: center; min-height: 100vh; position: relative; overflow-x: hidden; }
+    .container { width: 100%; max-width: 980px; display: flex; flex-direction: column; gap: 12px; z-index: 10; }
+
+    /* Ambient Vignette Overlay */
+    #ambient-vignette {
+      position: fixed; inset: 0; pointer-events: none; z-index: 5; transition: box-shadow 0.3s ease; box-shadow: inset 0 0 0 0 transparent;
+    }
+    body.vignette-burst #ambient-vignette { box-shadow: inset 0 0 60px 15px rgba(234, 179, 8, 0.35); }
+    body.vignette-execute #ambient-vignette { box-shadow: inset 0 0 60px 15px rgba(239, 68, 68, 0.35); }
+    body.vignette-proc #ambient-vignette { box-shadow: inset 0 0 70px 20px rgba(56, 189, 248, 0.45); }
+
+    /* Panels */
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 12px; }
+    .header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+    
+    /* Config Controls */
+    .controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    select, input[type="number"], button { 
+      background: #090d16; color: #fff; border: 1px solid var(--border); padding: 5px 8px; border-radius: 4px; font-size: 0.8rem; 
+    }
+    input[type="number"] { width: 65px; text-align: center; }
+    button { cursor: pointer; transition: background 0.15s; }
+    button:hover { background: #1f2d45; }
+    .btn-active { background: #b45309 !important; border-color: #f59e0b !important; }
+    .btn-pause { background: #0369a1; border-color: #38bdf8; }
+    .lang-select { background: #1e293b; border-color: #38bdf8; font-weight: bold; }
+    .preset-select { background: #1e293b; border-color: #f59e0b; color: #fef3c7; font-weight: bold; }
+
+    /* Score & Timing HUD */
+    .score-hud { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; background: #060911; padding: 8px 12px; border-radius: 6px; }
+    .score-box { display: flex; flex-direction: column; align-items: center; }
+    .score-box-label { font-size: 0.68rem; color: #94a3b8; font-weight: bold; text-transform: uppercase; }
+    .score-box-val { font-size: 1.15rem; font-weight: 800; }
+
+    /* Floating Combat Text Layer */
+    #fct-layer { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 30; }
+    .fct-text {
+      position: absolute; font-weight: 900; font-size: 1.1rem; text-shadow: 0 0 4px #000, 2px 2px 2px #000;
+      animation: fctFloat 0.85s cubic-bezier(0.1, 0.8, 0.3, 1) forwards;
+    }
+    @keyframes fctFloat {
+      0% { opacity: 1; transform: translateY(0) scale(0.85); }
+      20% { transform: translateY(-12px) scale(1.15); }
+      100% { opacity: 0; transform: translateY(-45px) scale(0.95); }
+    }
+
+    /* Stats Grid */
+    .stats-panel { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; background: #060911; padding: 8px 12px; border-radius: 6px; }
+    .stat-box { display: flex; align-items: center; justify-content: space-between; font-size: 0.75rem; }
+    .stat-box label { color: #94a3b8; font-weight: 600; }
+    .stat-input-group { display: flex; align-items: center; gap: 2px; }
+    .stat-input-group input { width: 50px; padding: 2px 4px; font-weight: bold; }
+
+    .talents-panel { display: flex; flex-direction: column; gap: 8px; background: #060911; padding: 10px 12px; border-radius: 6px; font-size: 0.78rem; }
+    .talent-header-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+    .talent-chips-grid { display: flex; gap: 6px; flex-wrap: wrap; }
+    .talent-chip {
+      padding: 3px 8px; border-radius: 12px; font-size: 0.7rem; font-weight: 600; cursor: pointer;
+      background: #1e293b; border: 1px solid #334155; color: #94a3b8; transition: all 0.15s;
+    }
+    .talent-chip.active { background: #1e3a8a; border-color: #3b82f6; color: #93c5fd; }
+
+    /* Target & Info */
+    .target-bar { display: flex; justify-content: space-between; align-items: center; background: #00000040; padding: 6px 12px; border-radius: 6px; }
+    .stats-badge { background: #233044; padding: 3px 8px; border-radius: 10px; font-weight: bold; font-size: 0.78rem; }
+    .status-badge-idle { background: #475569; color: #cbd5e1; }
+    .status-badge-combat { background: #991b1b; color: #fecaca; }
+    .status-badge-paused { background: #854d0e; color: #fef08a; }
+
+    /* Resource Bars & Dual Timers */
+    .resource-container { display: flex; flex-direction: column; gap: 5px; }
+    .bar-bg { background: #000; height: 20px; border-radius: 4px; overflow: hidden; position: relative; border: 1px solid #334155; }
+    .bar-fill { height: 100%; transition: width 0.04s linear; }
+    .bar-text { position: absolute; width: 100%; text-align: center; font-size: 11px; line-height: 20px; font-weight: bold; top: 0; text-shadow: 1px 1px 2px #000; }
+    .rage-fill { background: linear-gradient(90deg, #991b1b, #ef4444); width: 0%; }
+    
+    .channel-bar-wrapper { display: none; flex-direction: column; gap: 2px; }
+    .channel-bar-bg { background: #000; height: 14px; border-radius: 3px; overflow: hidden; position: relative; border: 1px solid var(--channel); }
+    .channel-fill { background: linear-gradient(90deg, #7e22ce, #c084fc); width: 100%; height: 100%; }
+    .channel-text { position: absolute; width: 100%; text-align: center; font-size: 10px; line-height: 14px; font-weight: bold; top: 0; text-shadow: 1px 1px 2px #000; }
+
+    .dual-timers { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .sub-bar-wrapper { display: flex; flex-direction: column; gap: 2px; }
+    .sub-bar-label { font-size: 0.7rem; color: #94a3b8; display: flex; justify-content: space-between; }
+    .sub-bar-bg { background: #090d16; height: 5px; border-radius: 2px; overflow: hidden; border: 1px solid #1e293b; }
+    .gcd-fill { background: #facc15; width: 0%; height: 100%; }
+    .swing-fill { background: #38bdf8; width: 0%; height: 100%; }
+
+    /* Auras */
+    .auras { display: flex; gap: 6px; min-height: 26px; flex-wrap: wrap; }
+    .aura-pill { padding: 2px 7px; border-radius: 4px; font-size: 0.72rem; font-weight: bold; display: flex; align-items: center; gap: 4px; border: 1px solid transparent; }
+    .aura-active { background: #1e3a8a; border-color: #3b82f6; }
+    .aura-proc { background: #854d0e; border-color: #eab308; animation: pulse 1s infinite alternate; }
+    .aura-channel { background: #581c87; border-color: #c084fc; animation: pulse 0.7s infinite alternate; }
+    .aura-demise { background: #4c1d95; border-color: #a78bfa; }
+    .aura-precision { background: #831843; border-color: var(--precision); color: #fdf2f8; }
+    .aura-precision.ready { animation: pulse 0.8s infinite alternate; border-color: #f472b6; }
+    .aura-ss { background: #881337; border-color: var(--ss); color: #ffe4e6; }
+    .aura-queue { background: #78350f; border-color: #f59e0b; color: #fef3c7; }
+
+    /* Action Bar */
+    .action-bar-wrapper { display: flex; flex-direction: column; gap: 8px; position: relative; }
+    .action-bar { display: flex; flex-wrap: wrap; gap: 8px; min-height: 70px; align-items: center; }
+    .action-slot {
+      width: 62px; height: 62px; background: #090d16; border: 2px solid #334155; border-radius: 6px;
+      position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center;
+      cursor: pointer; overflow: hidden; transition: transform 0.05s, border-color 0.15s, opacity 0.15s;
+    }
+    .action-slot:active, .action-slot.pressed { transform: scale(0.92); }
+    .action-slot.glow { border-color: #facc15; box-shadow: 0 0 10px rgba(250, 204, 21, 0.7); }
+    .action-slot.proc-heroic { border-color: #38bdf8; box-shadow: 0 0 12px rgba(56, 189, 248, 0.8); }
+    .action-slot.channel-locked { opacity: 0.45; filter: grayscale(0.5); }
+    .action-slot.channel-canceler { border-color: #c084fc; box-shadow: 0 0 10px rgba(192, 132, 252, 0.8); }
+    .action-slot.queued { border-color: #f59e0b; box-shadow: 0 0 12px rgba(245, 158, 11, 0.9); }
+    
+    .radial-cd-overlay { position: absolute; inset: 0; pointer-events: none; border-radius: 4px; z-index: 2; }
+    .cd-number {
+      position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+      font-weight: 800; font-size: 1.1rem; color: #ffffff; text-shadow: 0 0 4px #000, 1px 1px 2px #000; z-index: 3; pointer-events: none;
+    }
+
+    .keybind { position: absolute; top: 2px; left: 3px; font-size: 0.72rem; font-weight: bold; color: #f1f5f9; background: #000000bd; padding: 1px 4px; border-radius: 3px; z-index: 4; }
+    .cost { position: absolute; bottom: 2px; right: 3px; font-size: 0.68rem; color: #f87171; font-weight: bold; z-index: 4; }
+    .charges { position: absolute; top: 2px; right: 3px; font-size: 0.72rem; font-weight: bold; color: #38bdf8; z-index: 4; }
+    .charges.ss-badge { color: #f43f5e; background: #4c0519; padding: 0 3px; border-radius: 3px; border: 1px solid #e11d48; }
+    .spell-name { font-size: 0.62rem; text-align: center; font-weight: 600; padding: 2px; line-height: 1.1; color: #cbd5e1; z-index: 1; word-break: break-word; }
+
+    .slot-edit-tools {
+      position: absolute; inset: 0; background: rgba(15, 23, 42, 0.94); z-index: 5;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+    }
+    .slot-edit-tools button { padding: 2px 5px; font-size: 0.65rem; border: 1px solid #475569; }
+
+    .hud-feedback { text-align: center; font-size: 0.95rem; font-weight: bold; min-height: 22px; transition: color 0.1s; }
+
+    /* Diagnostic Panels */
+    .analyzer-panel { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 8px; background: #060911; padding: 10px; border-radius: 6px; }
+    .analyzer-card { background: #131b2b; border: 1px solid #233044; border-radius: 6px; padding: 8px; display: flex; flex-direction: column; gap: 3px; }
+    .analyzer-title { font-size: 0.7rem; color: #94a3b8; font-weight: bold; text-transform: uppercase; }
+    .analyzer-val { font-size: 1.1rem; font-weight: bold; color: #f8fafc; }
+    .analyzer-sub { font-size: 0.68rem; color: #64748b; }
+
+    /* Most Common Problems Box */
+    .problems-container { display: flex; flex-direction: column; gap: 8px; background: #060911; padding: 10px; border-radius: 6px; border: 1px solid #233044; }
+    .problem-card {
+      background: #131b2b; border: 1px solid #334155; border-radius: 6px; padding: 10px 12px;
+      display: flex; justify-content: space-between; align-items: center; gap: 12px;
+    }
+    .problem-info { display: flex; flex-direction: column; gap: 6px; flex: 1; }
+    .problem-title { font-size: 0.8rem; color: #f8fafc; line-height: 1.3; font-weight: 500; }
+    .problem-bar-wrapper { display: flex; align-items: center; gap: 8px; font-size: 0.72rem; color: #94a3b8; font-weight: bold; }
+    .problem-bar-bg { width: 140px; height: 7px; background: #1e293b; border-radius: 3px; overflow: hidden; }
+    .problem-bar-fill { height: 100%; background: #ef4444; }
+    .btn-show-me {
+      background: #1e293b; border: 1px solid #475569; color: #f8fafc; padding: 6px 12px;
+      border-radius: 4px; font-size: 0.75rem; font-weight: bold; white-space: nowrap; transition: all 0.15s;
+    }
+    .btn-show-me:hover { background: #334155; border-color: #38bdf8; }
+
+    /* Timeline Log & Filter */
+    .log-header-row { display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; font-weight: bold; }
+    .filter-indicator { background: #991b1b; color: #fef2f2; padding: 2px 8px; border-radius: 4px; font-size: 0.72rem; display: flex; align-items: center; gap: 6px; }
+    .log-container { height: 150px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; background: #05080e; padding: 8px; border-radius: 6px; font-family: monospace; font-size: 0.78rem; }
+    .log-entry { display: flex; justify-content: space-between; padding: 4px 8px; border-radius: 4px; background: #101623; border-left: 4px solid #64748b; cursor: pointer; transition: background 0.1s; }
+    .log-entry:hover { background: #1b263b; }
+    .log-entry.perfect { border-color: var(--perfect); }
+    .log-entry.good { border-color: var(--good); }
+    .log-entry.late { border-color: var(--late); }
+    .log-entry.suboptimal { border-color: var(--suboptimal); }
+    .log-entry.error { border-color: var(--error); }
+    .log-entry.channel { border-color: var(--channel); }
+
+    /* Modal */
+    .modal-backdrop {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.75); display: none; align-items: center; justify-content: center; z-index: 60;
+    }
+    .modal-box { background: #1e293b; border: 1px solid #475569; border-radius: 8px; padding: 16px; width: 400px; display: flex; flex-direction: column; gap: 10px; }
+    .audit-row { display: flex; justify-content: space-between; font-size: 0.8rem; border-bottom: 1px solid #334155; padding-bottom: 4px; }
+    .audit-reason-box { background: #090d16; border: 1px solid #334155; border-radius: 4px; padding: 8px; font-size: 0.78rem; line-height: 1.35; color: #93c5fd; }
+
+    @keyframes pulse { from { opacity: 0.8; } to { opacity: 1; filter: drop-shadow(0 0 4px #eab308); } }
+  </style>
+</head>
+<body>
+
+<div id="ambient-vignette"></div>
+<div id="fct-layer"></div>
+
+<div class="container">
+  <!-- Header / Controls -->
+  <div class="card header">
+    <div>
+      <h2 style="font-size: 1.15rem;" id="ui-title">Rotation Trainer: Warrior Arms Slayer</h2>
+      <div style="font-size: 0.75rem; color: #94a3b8;" id="ui-subtitle">SimC APL v12.1.0 + ST / 2-Target Cleave / 3+ Target AoE + Fervor of Battle</div>
+    </div>
+    <div class="controls">
+      <select id="lang-select" class="lang-select" onchange="setLanguage(this.value)">
+        <option value="en" selected>English</option>
+        <option value="es">Español</option>
+      </select>
+      <label style="font-size: 0.8rem;">
+        <span id="ui-label-enemies">Enemies:</span>
+        <select id="target-count-select" onchange="updateCombatScenario()">
+          <option value="1" id="opt-enemies-1">1 Target (ST)</option>
+          <option value="2" id="opt-enemies-2">2 Targets (Cleave)</option>
+          <option value="3" id="opt-enemies-3">3+ Targets (AoE)</option>
+        </select>
+      </label>
+      <label style="font-size: 0.8rem;">
+        <span id="ui-label-dummy">HP:</span>
+        <select id="dummy-hp" onchange="updateCombatScenario()">
+          <option value="100" id="opt-hp-100">100% HP</option>
+          <option value="20" id="opt-hp-20">20% HP (Execute)</option>
+        </select>
+      </label>
+      <label style="font-size: 0.8rem; display: flex; align-items: center; gap: 3px;">
+        <span id="ui-label-ping">Ping:</span>
+        <input type="number" id="ping-input" min="0" max="1000" value="40" oninput="updatePing(this.value)"> ms
+      </label>
+      <label style="font-size: 0.8rem; display: flex; align-items: center; gap: 3px;">
+        <span id="ui-label-sqw">SQW:</span>
+        <input type="number" id="sqw-input" min="0" max="600" value="400" oninput="updateSQW(this.value)"> ms
+      </label>
+      <button id="btn-pause-toggle" class="btn-pause" onclick="togglePauseCombat()">Pause</button>
+      <button id="btn-edit-mode" onclick="toggleEditMode()">Edit Action Bar</button>
+      <button id="btn-reset" onclick="resetCombat()" style="background: #334155;">Reset</button>
+    </div>
+  </div>
+
+  <!-- Score & Timing HUD -->
+  <div class="card" style="padding: 6px 12px;">
+    <div class="score-hud">
+      <div class="score-box">
+        <span class="score-box-label" id="ui-hud-score">Total Score</span>
+        <span class="score-box-val" id="score-val" style="color: #facc15;">0</span>
+      </div>
+      <div class="score-box">
+        <span class="score-box-label" id="ui-hud-combo">Streak / Combo</span>
+        <span class="score-box-val" id="combo-val" style="color: #38bdf8;">x0 (1.0x)</span>
+      </div>
+      <div class="score-box">
+        <span class="score-box-label" id="ui-hud-timing">Last Timing</span>
+        <span class="score-box-val" id="timing-val" style="color: #94a3b8;">- ms</span>
+      </div>
+      <div class="score-box">
+        <span class="score-box-label" id="ui-hud-grade">Reaction Quality</span>
+        <span class="score-box-val" id="grade-val" style="color: #94a3b8;">READY</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Talent Presets & Interactive Chips -->
+  <div class="card" style="padding: 10px;">
+    <div class="talents-panel">
+      <div class="talent-header-row">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <label style="color: #94a3b8; font-weight: bold;" id="ui-label-talents">Slayer Build Preset:</label>
+          <select id="preset-select" class="preset-select" onchange="loadPresetBuild(this.value)">
+            <option value="st_1t">Single Target</option>
+            <option value="cleave_2t">2 Target Cleave</option>
+            <option value="aoe_3t">AoE 3 Targets+</option>
+          </select>
+        </div>
+        <span style="font-size: 0.72rem; color: #64748b;" id="ui-chip-hint">Click chips to toggle talent hooks manually:</span>
+      </div>
+      <div>
+        <div class="talent-chips-grid" id="talent-chips-container"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Combat Status & Resources -->
+  <div class="card" style="display: flex; flex-direction: column; gap: 8px;">
+    <div class="target-bar">
+      <div><strong id="ui-label-target">Target:</strong> <span id="target-scenario-text">1 Target (100% HP)</span></div>
+      <div style="display: flex; gap: 8px; align-items: center;">
+        <span class="stats-badge status-badge-idle" id="combat-status-badge">Idle</span>
+        <div class="stats-badge"><span id="ui-label-time">Time:</span> <span id="combat-clock">00:00</span></div>
+        <div class="stats-badge">APL Match: <span id="accuracy-rate">100%</span></div>
+        <div class="stats-badge"><span id="ui-label-casts">Casts:</span> <span id="total-casts">0</span></div>
+      </div>
+    </div>
+
+    <div class="auras" id="auras-list"></div>
+
+    <div class="resource-container">
+      <div class="bar-bg">
+        <div class="bar-fill rage-fill" id="rage-bar"></div>
+        <div class="bar-text" id="rage-text">Rage: 40 / 100</div>
+      </div>
+
+      <div class="channel-bar-wrapper" id="channel-wrapper">
+        <div class="channel-bar-bg">
+          <div class="channel-fill" id="channel-bar"></div>
+          <div class="channel-text" id="channel-text">Channeling Bladestorm...</div>
+        </div>
+      </div>
+      
+      <div class="dual-timers">
+        <div class="sub-bar-wrapper">
+          <div class="sub-bar-label">
+            <span id="ui-label-gcd">GCD Tracker</span>
+            <span id="gcd-val-text">1.14s</span>
+          </div>
+          <div class="sub-bar-bg">
+            <div class="gcd-fill" id="gcd-bar"></div>
+          </div>
+        </div>
+        <div class="sub-bar-wrapper">
+          <div class="sub-bar-label">
+            <span id="ui-label-swing">Auto-Attack Swing Timer</span>
+            <span id="swing-val-text">2.18s</span>
+          </div>
+          <div class="sub-bar-bg">
+            <div class="swing-fill" id="swing-bar"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="hud-feedback" id="hud-feedback" style="color: #94a3b8;">Press your first keybind to begin combat...</div>
+
+  <!-- Action Bar -->
+  <div class="card action-bar-wrapper">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <span style="font-size: 0.8rem; font-weight: bold; color: #94a3b8;" id="ui-label-actionbar">Action Bar</span>
+      <button id="btn-add-slot" onclick="addNewSlot()" style="display: none; padding: 2px 6px; font-size: 0.72rem; background: #047857; border-color: #10b981;">+ Add Slot</button>
+    </div>
+    <div class="action-bar" id="action-bar"></div>
+  </div>
+
+  <!-- Diagnostic Metrics -->
+  <div class="card" style="display: flex; flex-direction: column; gap: 8px;">
+    <div style="font-weight: bold; font-size: 0.8rem; color: #94a3b8;" id="ui-label-metrics">Factual Execution Metrics</div>
+    <div class="analyzer-panel">
+      <div class="analyzer-card">
+        <span class="analyzer-title" id="ui-m-apm">Actions / Minute (APM)</span>
+        <span class="analyzer-val" id="analyzer-apm">0.0</span>
+        <span class="analyzer-sub" id="ui-sub-apm">SimC Benchmark: ~53.8 APM</span>
+      </div>
+      <div class="analyzer-card">
+        <span class="analyzer-title" id="ui-m-procs">Wasted Procs</span>
+        <span class="analyzer-val" id="analyzer-wasted-procs" style="color: #f87171;">0</span>
+        <span class="analyzer-sub" id="ui-sub-procs">Overwritten or missed</span>
+      </div>
+      <div class="analyzer-card">
+        <span class="analyzer-title" id="ui-m-ms">Mortal Strike Held</span>
+        <span class="analyzer-val" id="analyzer-ms-held">0.0s</span>
+        <span class="analyzer-sub" id="ui-sub-ms">Available without casting</span>
+      </div>
+      <div class="analyzer-card">
+        <span class="analyzer-title" id="ui-m-rend">Rend Downtime</span>
+        <span class="analyzer-val" id="analyzer-rend-down">0.0s</span>
+        <span class="analyzer-sub" id="ui-sub-rend">Target bleed inactive</span>
+      </div>
+    </div>
+
+    <!-- Most Common Problems -->
+    <div style="font-weight: bold; font-size: 0.8rem; color: #94a3b8; margin-top: 4px;" id="ui-label-problems">Most Common Problems (Detected Patterns)</div>
+    <div class="problems-container" id="problems-container">
+      <div style="color: #64748b; font-style: italic; font-size: 0.8rem; text-align: center; padding: 12px;" id="ui-empty-problems">
+        Start rotating to detect recurring mistakes and improvement areas...
+      </div>
+    </div>
+  </div>
+
+  <!-- Timeline Log -->
+  <div class="card">
+    <div class="log-header-row">
+      <span id="ui-label-timeline">Cast Timeline (Click any ability to inspect coach audit)</span>
+      <div id="filter-wrapper" style="display: none;">
+        <span class="filter-indicator">
+          <span id="filter-label">Active Filter</span>
+          <button id="btn-clear-filter" onclick="clearTimelineFilter()" style="padding: 1px 5px; font-size: 0.65rem; background: #00000080; border: none; color: #fff; border-radius: 2px;">✕ Clear Filter</button>
+        </span>
+      </div>
+    </div>
+    <div class="log-container" id="log-container"></div>
+  </div>
+</div>
+
+<!-- Modal Audit -->
+<div class="modal-backdrop" id="audit-modal">
+  <div class="modal-box">
+    <h3 style="font-size: 0.95rem; color: #f8fafc;" id="audit-title">Spell Execution Audit</h3>
+    <div class="audit-row"><span id="lbl-audit-spell">Executed Spell:</span><strong id="audit-spell">-</strong></div>
+    <div class="audit-row"><span id="lbl-audit-ideal">Expected Spell (APL):</span><strong id="audit-ideal" style="color: #facc15;">-</strong></div>
+    <div class="audit-row"><span id="lbl-audit-timing">Timing Accuracy:</span><span id="audit-timing">-</span></div>
+    <div class="audit-row"><span id="lbl-audit-pattern">Error Pattern:</span><strong id="audit-pattern" style="color: #f87171;">-</strong></div>
+    <div class="audit-row"><span id="lbl-audit-state">Player Snapshot:</span><span id="audit-state">-</span></div>
+    <div>
+      <span style="font-size: 0.75rem; font-weight: bold; color: #94a3b8;" id="lbl-audit-reason">Coach Diagnostic:</span>
+      <div class="audit-reason-box" id="audit-reason"></div>
+    </div>
+    <div style="display: flex; justify-content: flex-end;">
+      <button onclick="closeAuditModal()" style="background: #2563eb; border-color: #3b82f6;" id="btn-audit-close">Got It</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Edit Keybind -->
+<div class="modal-backdrop" id="slot-modal">
+  <div class="modal-box">
+    <h3 style="font-size: 0.95rem;" id="lbl-modal-edit">Configure Button</h3>
+    <div>
+      <label style="font-size: 0.75rem;" id="lbl-modal-spell">Ability:</label>
+      <select id="modal-spell-select" style="width: 100%; margin-top: 3px;"></select>
+    </div>
+    <div>
+      <label style="font-size: 0.75rem;">Keybind:</label>
+      <input type="text" id="modal-key-input" maxlength="2" style="width: 100%; margin-top: 3px; text-transform: uppercase; text-align: center; font-weight: bold;">
+    </div>
+    <div style="display: flex; justify-content: flex-end; gap: 6px; margin-top: 6px;">
+      <button onclick="closeModal()" id="btn-modal-cancel">Cancel</button>
+      <button onclick="saveModalConfig()" style="background: #2563eb; border-color: #3b82f6;" id="btn-modal-save">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ==========================================
+// 1. INTERNACIONALIZACIÓN (i18n DICCIONARIOS)
+// ==========================================
+const I18N = {
+  es: {
+    uiTitle: "Simulador de Rotación: Warrior Arms Slayer",
+    uiSubtitle: "APL SimC v12.1.0 + ST / 2 Objetivos Cleave / 3+ Objetivos AoE + Fervor of Battle",
+    labelEnemies: "Enemigos:",
+    optEnemies1: "1 Objetivo (ST)",
+    optEnemies2: "2 Objetivos (Cleave)",
+    optEnemies3: "3+ Objetivos (AoE)",
+    labelDummy: "Salud:",
+    optHp100: "100% HP",
+    optHp20: "20% HP (Execute)",
+    labelPing: "Ping:",
+    labelSqw: "SQW:",
+    btnPause: "Pausar",
+    btnResume: "Reanudar",
+    btnEditBar: "Configurar Barra",
+    btnFinishEdit: "Finalizar Edición",
+    btnReset: "Reiniciar",
+    hudScore: "Puntuación Total",
+    hudCombo: "Racha / Combo",
+    hudTiming: "Último Timing",
+    hudGrade: "Calidad de Reacción",
+    gradeReady: "LISTO",
+    gradeBroken: "C ROTO",
+    gradeRhythm: "B EN RITMO",
+    gradeGreat: "A EXCELENTE",
+    gradeGodlike: "S+ GODLIKE",
+    labelTalents: "Preset de Talentos Slayer:",
+    chipHint: "Haz clic en los chips para alternar talentos:",
+    optPresetST: "Single Target",
+    optPresetCleave: "2 Target Cleave",
+    optPresetAoE: "AoE 3 Targets+",
+    labelTarget: "Objetivo:",
+    statusIdle: "En Reposo",
+    statusCombat: "En Combate",
+    statusPaused: "En Pausa",
+    labelTime: "Tiempo:",
+    labelCasts: "Casts:",
+    rageLabel: "Furia",
+    channelingBS: "Canalizando Bladestorm...",
+    channelCancelHint: "para CancelAura",
+    labelGCD: "GCD Tracker",
+    labelSwing: "Auto-Attack Swing Timer",
+    hudPromptStart: "Presiona tu primer botón para comenzar el combate...",
+    hudPaused: "Simulación en Pausa",
+    hudResumed: "Simulación reanudada",
+    labelActionBar: "Barra de Acción",
+    btnAddSlot: "+ Añadir Botón",
+    labelMetrics: "Métricas Fácticas de Ejecución",
+    mAPM: "Acciones / Minuto (APM)",
+    subAPM: "Objetivo SimC: ~53.8 APM",
+    mWastedProcs: "Procs Desperdiciados",
+    subWastedProcs: "Sobreescritos o ignorados",
+    mMSHeld: "Mortal Strike Retenido",
+    subMSHeld: "Disponible sin usar",
+    mRendDown: "Tiempo de Rend Caído",
+    subRendDown: "DoT inactivo en objetivo",
+    labelProblems: "Problemas Más Comunes (Patrones Detectados)",
+    emptyProblems: "Comienza a rotar para detectar tus patrones de error y áreas de mejora...",
+    flawlessProblems: "✓ ¡Rotación Impecable! No se han detectado patrones de error recurrentes.",
+    labelTimeline: "Timeline de Habilidades (Haz clic en cualquier cast para ver auditoría)",
+    filterActive: "Filtro Activo",
+    btnClearFilter: "✕ Quitar Filtro",
+    auditTitle: "Auditoría de Habilidad",
+    lblAuditSpell: "Habilidad Ejecutada:",
+    lblAuditIdeal: "Habilidad Esperada (APL):",
+    lblAuditTiming: "Calidad de Timing:",
+    lblAuditPattern: "Patrón de Error:",
+    lblAuditState: "Estado del Personaje:",
+    lblAuditReason: "Diagnóstico del Entrenador:",
+    btnAuditClose: "Entendido",
+    lblModalEdit: "Configurar Botón",
+    lblModalSpell: "Habilidad:",
+    btnModalCancel: "Cancelar",
+    btnModalSave: "Guardar",
+    ofMistakes: "de tus errores",
+    showMe: "Show Me!",
+    optimalSequence: "Secuencia Óptima",
+    optimalDiagnosis: "Decisión óptima según la APL de SimulationCraft.",
+    auraQueue: "Encolado",
+    auraChannel: "¡Canalizando!",
+    auraProcSD: "¡Proc Sudden Death!",
+    auraProcHS: "¡Proc Heroic Strike!"
+  },
+  en: {
+    uiTitle: "Rotation Trainer: Warrior Arms Slayer",
+    uiSubtitle: "SimC APL v12.1.0 + ST / 2-Target Cleave / 3+ Target AoE + Fervor of Battle",
+    labelEnemies: "Enemies:",
+    optEnemies1: "1 Target (ST)",
+    optEnemies2: "2 Targets (Cleave)",
+    optEnemies3: "3+ Targets (AoE)",
+    labelDummy: "HP:",
+    optHp100: "100% HP",
+    optHp20: "20% HP (Execute)",
+    labelPing: "Ping:",
+    labelSqw: "SQW:",
+    btnPause: "Pause",
+    btnResume: "Resume",
+    btnEditBar: "Edit Action Bar",
+    btnFinishEdit: "Finish Editing",
+    btnReset: "Reset",
+    hudScore: "Total Score",
+    hudCombo: "Streak / Combo",
+    hudTiming: "Last Timing",
+    hudGrade: "Reaction Quality",
+    gradeReady: "READY",
+    gradeBroken: "C BROKEN",
+    gradeRhythm: "B IN FLOW",
+    gradeGreat: "A GREAT",
+    gradeGodlike: "S+ GODLIKE",
+    labelTalents: "Slayer Build Preset:",
+    chipHint: "Click chips to toggle talent hooks manually:",
+    optPresetST: "Single Target",
+    optPresetCleave: "2 Target Cleave",
+    optPresetAoE: "AoE 3 Targets+",
+    labelTarget: "Target:",
+    statusIdle: "Idle",
+    statusCombat: "In Combat",
+    statusPaused: "Paused",
+    labelTime: "Time:",
+    labelCasts: "Casts:",
+    rageLabel: "Rage",
+    channelingBS: "Channeling Bladestorm...",
+    channelCancelHint: "to CancelAura",
+    labelGCD: "GCD Tracker",
+    labelSwing: "Auto-Attack Swing Timer",
+    hudPromptStart: "Press your first keybind to begin combat...",
+    hudPaused: "Simulation Paused",
+    hudResumed: "Simulation Resumed",
+    labelActionBar: "Action Bar",
+    btnAddSlot: "+ Add Slot",
+    labelMetrics: "Factual Execution Metrics",
+    mAPM: "Actions / Minute (APM)",
+    subAPM: "SimC Benchmark: ~53.8 APM",
+    mWastedProcs: "Wasted Procs",
+    subWastedProcs: "Overwritten or missed",
+    mMSHeld: "Mortal Strike Held",
+    subMSHeld: "Available without casting",
+    mRendDown: "Rend Downtime",
+    subRendDown: "Target bleed inactive",
+    labelProblems: "Most Common Problems (Detected Patterns)",
+    emptyProblems: "Start rotating to detect recurring mistakes and improvement areas...",
+    flawlessProblems: "✓ Flawless Execution! No recurring error patterns detected.",
+    labelTimeline: "Cast Timeline (Click any ability to inspect coach audit)",
+    filterActive: "Active Filter",
+    btnClearFilter: "✕ Clear Filter",
+    auditTitle: "Spell Execution Audit",
+    lblAuditSpell: "Executed Spell:",
+    lblAuditIdeal: "Expected Spell (APL):",
+    lblAuditTiming: "Timing Accuracy:",
+    lblAuditPattern: "Error Pattern:",
+    lblAuditState: "Player Snapshot:",
+    lblAuditReason: "Coach Diagnostic:",
+    btnAuditClose: "Got It",
+    lblModalEdit: "Configure Button",
+    lblModalSpell: "Ability:",
+    btnModalCancel: "Cancel",
+    btnModalSave: "Save",
+    ofMistakes: "of mistakes",
+    showMe: "Show Me!",
+    optimalSequence: "Optimal Sequence",
+    optimalDiagnosis: "Optimal cast choice following SimulationCraft APL priorities.",
+    auraQueue: "Queued",
+    auraChannel: "Channeling!",
+    auraProcSD: "Sudden Death Proc!",
+    auraProcHS: "Heroic Strike Proc!"
+  }
+};
+
+let currentLang = "en"; // Default: English
+
+function t(key) {
+  return (I18N[currentLang] && I18N[currentLang][key]) || key;
+}
+
+function setLanguage(lang) {
+  currentLang = lang;
+  document.getElementById("lang-select").value = lang;
+  updateStaticLanguageUI();
+  renderTalentChips();
+  buildActionBarUI();
+  renderMostCommonProblems();
+  renderTimelineView();
+}
+
+function updateStaticLanguageUI() {
+  document.getElementById("ui-title").innerText = t("uiTitle");
+  document.getElementById("ui-subtitle").innerText = t("uiSubtitle");
+  document.getElementById("ui-label-enemies").innerText = t("labelEnemies");
+  document.getElementById("opt-enemies-1").innerText = t("optEnemies1");
+  document.getElementById("opt-enemies-2").innerText = t("optEnemies2");
+  document.getElementById("opt-enemies-3").innerText = t("optEnemies3");
+  document.getElementById("ui-label-dummy").innerText = t("labelDummy");
+  document.getElementById("opt-hp-100").innerText = t("optHp100");
+  document.getElementById("opt-hp-20").innerText = t("optHp20");
+  document.getElementById("ui-label-ping").innerText = t("labelPing");
+  document.getElementById("ui-label-sqw").innerText = t("labelSqw");
+  document.getElementById("btn-reset").innerText = t("btnReset");
+  document.getElementById("btn-pause-toggle").innerText = state.combatPaused ? t("btnResume") : t("btnPause");
+  document.getElementById("btn-edit-mode").innerText = isEditMode ? t("btnFinishEdit") : t("btnEditBar");
+  
+  document.getElementById("ui-hud-score").innerText = t("hudScore");
+  document.getElementById("ui-hud-combo").innerText = t("hudCombo");
+  document.getElementById("ui-hud-timing").innerText = t("hudTiming");
+  document.getElementById("ui-hud-grade").innerText = t("hudGrade");
+
+  document.getElementById("ui-label-talents").innerText = t("labelTalents");
+  document.getElementById("ui-chip-hint").innerText = t("chipHint");
+  
+  const presetSelect = document.getElementById("preset-select");
+  presetSelect.options[0].text = t("optPresetST");
+  presetSelect.options[1].text = t("optPresetCleave");
+  presetSelect.options[2].text = t("optPresetAoE");
+
+  document.getElementById("ui-label-target").innerText = t("labelTarget");
+  document.getElementById("ui-label-time").innerText = t("labelTime");
+  document.getElementById("ui-label-casts").innerText = t("labelCasts");
+  document.getElementById("ui-label-gcd").innerText = t("labelGCD");
+  document.getElementById("ui-label-swing").innerText = t("labelSwing");
+  document.getElementById("ui-label-actionbar").innerText = t("labelActionBar");
+  document.getElementById("btn-add-slot").innerText = t("btnAddSlot");
+
+  document.getElementById("ui-label-metrics").innerText = t("labelMetrics");
+  document.getElementById("ui-m-apm").innerText = t("mAPM");
+  document.getElementById("ui-sub-apm").innerText = t("subAPM");
+  document.getElementById("ui-m-procs").innerText = t("mWastedProcs");
+  document.getElementById("ui-sub-procs").innerText = t("subWastedProcs");
+  document.getElementById("ui-m-ms").innerText = t("mMSHeld");
+  document.getElementById("ui-sub-ms").innerText = t("subMSHeld");
+  document.getElementById("ui-m-rend").innerText = t("mRendDown");
+  document.getElementById("ui-sub-rend").innerText = t("subRendDown");
+
+  document.getElementById("ui-label-problems").innerText = t("labelProblems");
+  document.getElementById("ui-label-timeline").innerText = t("labelTimeline");
+  document.getElementById("btn-clear-filter").innerText = t("btnClearFilter");
+
+  document.getElementById("audit-title").innerText = t("auditTitle");
+  document.getElementById("lbl-audit-spell").innerText = t("lblAuditSpell");
+  document.getElementById("lbl-audit-ideal").innerText = t("lblAuditIdeal");
+  document.getElementById("lbl-audit-timing").innerText = t("lblAuditTiming");
+  document.getElementById("lbl-audit-pattern").innerText = t("lblAuditPattern");
+  document.getElementById("lbl-audit-state").innerText = t("lblAuditState");
+  document.getElementById("lbl-audit-reason").innerText = t("lblAuditReason");
+  document.getElementById("btn-audit-close").innerText = t("btnAuditClose");
+
+  document.getElementById("lbl-modal-edit").innerText = t("lblModalEdit");
+  document.getElementById("lbl-modal-spell").innerText = t("lblModalSpell");
+  document.getElementById("btn-modal-cancel").innerText = t("btnModalCancel");
+  document.getElementById("btn-modal-save").innerText = t("btnModalSave");
+  updateTargetScenarioText();
+}
+
+function updateTargetScenarioText() {
+  const countText = state.targetCount === 1 ? (currentLang === "en" ? "1 Target" : "1 Objetivo") : 
+                    state.targetCount === 2 ? (currentLang === "en" ? "2 Targets (Cleave)" : "2 Objetivos (Cleave)") : 
+                    (currentLang === "en" ? "3+ Targets (AoE)" : "3+ Objetivos (AoE)");
+  const hpText = state.targetHP <= 20 ? (currentLang === "en" ? "20% HP (Execute)" : "20% HP (Execute)") : "100% HP";
+  document.getElementById("target-scenario-text").innerText = `${countText} (${hpText})`;
+}
+
+// ==========================================
+// 2. AUDIO SINTETIZADO (WEB AUDIO API)
+// ==========================================
+let audioCtx = null;
+function initAudio() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (audioCtx.state === 'suspended') {
+    audioCtx.resume();
+  }
+}
+
+function playSynthesizedTone(freq, type, duration, gainVal = 0.08) {
+  if (!audioCtx) return;
+  try {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+    gain.gain.setValueAtTime(gainVal, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + duration);
+  } catch (e) {}
+}
+
+function playAudioFeedback(type) {
+  initAudio();
+  if (type === "perfect") {
+    playSynthesizedTone(880, "sine", 0.08, 0.09);
+    setTimeout(() => playSynthesizedTone(1320, "sine", 0.12, 0.08), 40);
+  } else if (type === "good") {
+    playSynthesizedTone(660, "sine", 0.1, 0.08);
+  } else if (type === "late") {
+    playSynthesizedTone(440, "triangle", 0.12, 0.08);
+  } else if (type === "error" || type === "miss") {
+    playSynthesizedTone(130, "sawtooth", 0.18, 0.12);
+  } else if (type === "proc") {
+    playSynthesizedTone(1046, "sine", 0.08, 0.08);
+    setTimeout(() => playSynthesizedTone(1318, "sine", 0.08, 0.08), 50);
+    setTimeout(() => playSynthesizedTone(1567, "sine", 0.15, 0.08), 100);
+  }
+}
+
+// ==========================================
+// 3. TAXONOMÍA DE PATRONES DE ERROR (ST & AoE)
+// ==========================================
+const ERROR_TAXONOMY = {
+  SKIPPED_SWEEPING_STRIKES: {
+    id: "SKIPPED_SWEEPING_STRIKES",
+    title_es: "Olvidaste activar Sweeping Strikes en presencia de múltiples objetivos (2+ enemies)",
+    tip_es: "Sweeping Strikes otorga cargas para duplicar tus ataques a un segundo objetivo. Es la prioridad #1 al luchar contra 2 o más enemigos[cite: 1].",
+    title_en: "You frequently skipped casting Sweeping Strikes with multiple active targets (2+ enemies)",
+    tip_en: "Sweeping Strikes grants charges to duplicate your single-target abilities to a second target[cite: 1]."
+  },
+  SKIPPED_AOE_CLEAVE: {
+    id: "SKIPPED_AOE_CLEAVE",
+    title_es: "No priorizaste Cleave en pulls de área masiva (3+ enemigos)",
+    tip_es: "En AoE con Fervor of Battle, Cleave aplica Rend, castea Slam y consume Heroic Strike sin necesidad de usar Slam directamente[cite: 1].",
+    title_en: "You failed to prioritize Cleave during massive AoE (3+ targets)",
+    tip_en: "In AoE situations with Fervor of Battle, Cleave triggers Slam, applies Rend, and consumes Heroic Strike procs[cite: 1]."
+  },
+  SKIPPED_HEROIC_STRIKE: {
+    id: "SKIPPED_HEROIC_STRIKE",
+    title_es: "Ignoraste frecuentemente Heroic Strike cuando tenías el proc activo",
+    tip_es: "Heroic Strike tiene la prioridad más alta de daño por GCD en Single Target. No usarlo retrasa tu daño y arriesga perder el beneficio[cite: 1].",
+    title_en: "You frequently skipped casting Heroic Strike when its proc was active",
+    tip_en: "Heroic Strike holds highest damage priority per GCD in Single Target[cite: 1]."
+  },
+  OVERSTACKED_PRECISION: {
+    id: "OVERSTACKED_PRECISION",
+    title_es: "Lanzaste Execute teniendo 2 stacks de Executioner's Precision en lugar de Mortal Strike",
+    tip_es: "Al llegar a 2 acumulaciones de Executioner's Precision, la APL exige descargar Mortal Strike de inmediato para potenciar su golpe y no desperdiciar stacks[cite: 1].",
+    title_en: "You cast Execute with 2 stacks of Executioner's Precision instead of Mortal Strike",
+    tip_en: "Upon reaching 2 stacks of Executioner's Precision, the APL demands casting Mortal Strike to discharge the massive damage amp[cite: 1]."
+  },
+  EARLY_MS_EXECUTE: {
+    id: "EARLY_MS_EXECUTE",
+    title_es: "Lanzaste Mortal Strike en fase Execute sin tener los 2 stacks de Executioner's Precision",
+    tip_es: "En fase de Execute, Mortal Strike solo debe presionarse como detonador con 2 stacks. Lanzarlo antes consume Furia y GCDs que corresponden a Execute[cite: 1].",
+    title_en: "You cast Mortal Strike during Execute phase before reaching 2 Executioner's Precision stacks",
+    tip_en: "During Execute phase, Mortal Strike is strictly an empowered discharge at 2 stacks[cite: 1]."
+  },
+  DELAYED_MORTAL_STRIKE: {
+    id: "DELAYED_MORTAL_STRIKE",
+    title_es: "Retuviste Mortal Strike disponible mientras usabas habilidades secundarias (Slam / Cleave)",
+    tip_es: "En Single Target, Mortal Strike es tu generador principal de daño y sangrados. Debe tirarse inmediatamente al salir de cooldown si hay Furia[cite: 1].",
+    title_en: "You held Mortal Strike off cooldown while using low-priority fillers (Slam / Cleave)",
+    tip_en: "In Single Target, Mortal Strike is your primary core hitter and bleed trigger[cite: 1]."
+  },
+  DROPPED_REND: {
+    id: "DROPPED_REND",
+    title_es: "Dejaste caer el sangrado de Rend por no refrescarlo con Cleave a tiempo",
+    tip_es: "Refresca Rend con Cleave cuando le queden ≤ 4.5s (ventana Pandemic) para acumular hasta 19.5s sin perder tiempo de daño del DoT[cite: 1].",
+    title_en: "You dropped Rend on the target by failing to refresh it with Cleave in time",
+    tip_en: "Refresh Rend with Cleave when remaining duration is ≤ 4.5s (Pandemic window)[cite: 1]."
+  },
+  DELAYED_BURST_CD: {
+    id: "DELAYED_BURST_CD",
+    title_es: "Retuviste Colossus Smash, Avatar o Bladestorm listos sin sincronizarlos",
+    tip_es: "Avatar, Colossus Smash y Bladestorm deben ejecutarse de forma fluida para concentrar todo el daño en la ventana multiplicativa[cite: 1].",
+    title_en: "You delayed casting Colossus Smash, Avatar, or Bladestorm while ready",
+    tip_en: "Avatar, Colossus Smash, and Bladestorm must be sequenced fluidly inside your major burst window[cite: 1]."
+  },
+  SKIPPED_SUDDEN_DEATH: {
+    id: "SKIPPED_SUDDEN_DEATH",
+    title_es: "Ignoraste el proc gratuito de Sudden Death",
+    tip_es: "Lanza Execute en cuanto salte Sudden Death para evitar que el siguiente autoataque sobreescriba el proc y se pierda[cite: 1].",
+    title_en: "You ignored a free Sudden Death proc",
+    tip_en: "Cast Execute immediately on Sudden Death procs[cite: 1]."
+  },
+  UNNECESSARY_FILLER: {
+    id: "UNNECESSARY_FILLER",
+    title_es: "Usaste Slam en AoE o cuando la APL pedía usar Cleave / Cooldowns",
+    tip_es: "En AoE con Fervor of Battle, Slam nunca se castea directamente; se castea Cleave en su lugar[cite: 1].",
+    title_en: "You cast hardcast Slam in AoE or when Cleave / major CDs were demanded",
+    tip_en: "In AoE with Fervor of Battle, Slam is never hardcast; Cleave is used exclusively[cite: 1]."
+  },
+  GENERAL_SUBOPTIMAL: {
+    id: "GENERAL_SUBOPTIMAL",
+    title_es: "Secuencia subóptima según la lista de prioridades de SimulationCraft",
+    tip_es: "La habilidad elegida no correspondía al orden matemático óptimo en función del estado de Furia y cooldowns[cite: 1].",
+    title_en: "Suboptimal ability choice according to SimulationCraft priority list",
+    tip_en: "The chosen ability deviated from the mathematical priority order based on current Rage, cooldowns, and active buffs[cite: 1]."
+  }
+};
+
+function getErrorTaxonomyTitle(key) {
+  const item = ERROR_TAXONOMY[key];
+  if (!item) return key;
+  return currentLang === "en" ? item.title_en : item.title_es;
+}
+
+function getErrorTaxonomyTip(key) {
+  const item = ERROR_TAXONOMY[key];
+  if (!item) return "";
+  return currentLang === "en" ? item.tip_en : item.tip_es;
+}
+
+// ==========================================
+// 4. REGISTRO MODULAR DE TALENTOS & HOOKS (SLAYER EXCLUSIVO)
+// ==========================================
+const TALENT_REGISTRY = {
+  bloodletting: { 
+    id: "bloodletting", 
+    name_es: "Bloodletting", 
+    name_en: "Bloodletting", 
+    category: "arms", 
+    hooks: {} 
+  },
+  broad_strokes: {
+    id: "broad_strokes",
+    name_es: "Broad Strokes",
+    name_en: "Broad Strokes",
+    category: "arms",
+    hooks: {
+      onSpellCast: (spell, s, logFn) => {
+        if (spell.id === "CS") {
+          const current = s.auras.sweepingStrikesCharges;
+          const toAdd = 6;
+          const newTotal = Math.min(18, current + toAdd);
+          const gained = newTotal - current;
+          s.auras.sweepingStrikesCharges = newTotal;
+          s.auras.sweepingStrikesTimer = 30.0;
+          if (gained > 0) {
+            triggerFCT(`+${gained} SS Charges`, "#e11d48");
+            logFn(
+              currentLang === "en" ? "Broad Strokes" : "Broad Strokes", 
+              "perfect", 
+              currentLang === "en" ? `+${gained} Sweeping Strikes charges (${newTotal}/18)` : `+${gained} cargas de Sweeping Strikes (${newTotal}/18)`
+            );
+          }
+        }
+      }
+    }
+  },
+  fervor_of_battle: {
+    id: "fervor_of_battle",
+    name_es: "Fervor of Battle",
+    name_en: "Fervor of Battle",
+    category: "arms",
+    hooks: {
+      onSpellCast: (spell, s, logFn) => {
+        if (spell.id === "CLEAVE" && s.targetCount >= 2) {
+          if (s.auras.heroicStrike) {
+            s.auras.heroicStrike = false;
+            triggerFCT("Fervor HS Consumed", "#38bdf8");
+            logFn(
+              currentLang === "en" ? "Fervor of Battle" : "Fervor of Battle", 
+              "perfect", 
+              currentLang === "en" ? "Cleave triggered Slam and consumed Heroic Strike proc" : "Cleave casteó Slam y consumió el proc de Heroic Strike"
+            );
+          }
+        }
+      }
+    }
+  },
+  sudden_death: {
+    id: "sudden_death",
+    name_es: "Sudden Death",
+    name_en: "Sudden Death",
+    category: "arms",
+    hooks: {
+      onAutoAttack: (s) => {
+        if (Math.random() < 0.15) {
+          if (s.auras.suddenDeath) {
+            s.wastedProcsCount++;
+          }
+          s.auras.suddenDeath = true;
+          playAudioFeedback("proc");
+          triggerFCT("¡SUDDEN DEATH!", "#eab308");
+        }
+      }
+    }
+  },
+  executioners_precision: {
+    id: "executioners_precision",
+    name_es: "Executioner's Precision",
+    name_en: "Executioner's Precision",
+    category: "arms",
+    hooks: {
+      onSpellCast: (spell, s, logFn) => {
+        if (spell.id === "EXECUTE") {
+          if (s.auras.executionersPrecision === 2) {
+            s.wastedPrecisionStacks++;
+          } else {
+            s.auras.executionersPrecision = Math.min(2, s.auras.executionersPrecision + 1);
+          }
+        } else if (spell.id === "MS" && s.auras.executionersPrecision > 0) {
+          logFn(
+            currentLang === "en" ? "Precision Consumed" : "Precision Consumida", 
+            "perfect", 
+            currentLang === "en" ? `Consumed x${s.auras.executionersPrecision} Executioner's Precision` : `Consumidos x${s.auras.executionersPrecision} Executioner's Precision`
+          );
+          s.auras.executionersPrecision = 0;
+        }
+      }
+    }
+  },
+  dreadnaught: { id: "dreadnaught", name_es: "Dreadnaught", name_en: "Dreadnaught", category: "arms", hooks: {} },
+  unhinged: {
+    id: "unhinged",
+    name_es: "Unhinged",
+    name_en: "Unhinged",
+    category: "arms",
+    hooks: {
+      onChannelTick: (channel, s, dt, logFn) => {
+        if (channel.name === "Bladestorm") {
+          if (channel.remaining <= channel.total * 0.66 && channel.unhingedCastsDone === 0) {
+            channel.unhingedCastsDone = 1;
+            s.auras.overpowerBuff = 0;
+            triggerFCT("Unhinged MS", "#c084fc");
+            logFn("Unhinged: Mortal Strike", "channel", currentLang === "en" ? "Auto-cast #1 by Bladestorm" : "Cast automático #1 por Bladestorm");
+          } else if (channel.remaining <= channel.total * 0.33 && channel.unhingedCastsDone === 1) {
+            channel.unhingedCastsDone = 2;
+            s.auras.overpowerBuff = 0;
+            triggerFCT("Unhinged MS", "#c084fc");
+            logFn("Unhinged: Mortal Strike", "channel", currentLang === "en" ? "Auto-cast #2 by Bladestorm" : "Cast automático #2 por Bladestorm");
+          }
+        }
+      }
+    }
+  },
+  anger_management: {
+    id: "anger_management",
+    name_es: "Anger Management",
+    name_en: "Anger Management",
+    category: "arms",
+    hooks: {
+      onRageSpent: (spent, s) => {
+        const cdr = (spent / 20) * 1.0;
+        if (s.cds.CS > 0) s.cds.CS = Math.max(0, s.cds.CS - cdr);
+        if (s.cds.AVATAR > 0) s.cds.AVATAR = Math.max(0, s.cds.AVATAR - cdr);
+        if (s.cds.BS > 0) s.cds.BS = Math.max(0, s.cds.BS - cdr);
+      }
+    }
+  },
+  frothing_berserker: {
+    id: "frothing_berserker",
+    name_es: "Frothing Berserker",
+    name_en: "Frothing Berserker",
+    category: "class",
+    hooks: {
+      onRageSpent: (spent, s) => { s.rage = Math.min(100, s.rage + (spent * 0.10)); }
+    }
+  },
+  tactician: {
+    id: "tactician",
+    name_es: "Tactician",
+    name_en: "Tactician",
+    category: "arms",
+    hooks: {
+      onRageSpent: (spent, s, logFn) => {
+        if (Math.random() < (spent * 0.014) && s.opCharges < 2) {
+          s.opCharges = Math.min(2, s.opCharges + 1);
+          playAudioFeedback("proc");
+          triggerFCT("¡TACTICIAN!", "#38bdf8");
+          logFn("Tactician Proc", "perfect", currentLang === "en" ? "Overpower charge refunded" : "Recarga de Overpower devuelta");
+        }
+      }
+    }
+  },
+  massacre: { id: "massacre", name_es: "Massacre (35% Execute)", name_en: "Massacre (35% Execute)", category: "arms", hooks: {} }
+};
+
+function dispatchTalentHook(hookName, ...args) {
+  for (let talentId of state.activeTalents) {
+    const talent = TALENT_REGISTRY[talentId];
+    if (talent && talent.hooks && typeof talent.hooks[hookName] === "function") {
+      talent.hooks[hookName](...args);
+    }
+  }
+}
+
+// ==========================================
+// 3 PRESETS REORDENADOS (CON BLOODLETTING BASE)
+// ==========================================
+const SLAYER_PRESETS = {
+  st_1t: {
+    targetCount: 1,
+    talents: ["bloodletting", "sudden_death", "executioners_precision", "dreadnaught", "unhinged", "anger_management", "frothing_berserker", "tactician"]
+  },
+  cleave_2t: {
+    targetCount: 2,
+    talents: ["bloodletting", "broad_strokes", "sudden_death", "executioners_precision", "dreadnaught", "unhinged", "anger_management", "frothing_berserker", "tactician"]
+  },
+  aoe_3t: {
+    targetCount: 3,
+    talents: ["bloodletting", "broad_strokes", "fervor_of_battle", "dreadnaught", "unhinged", "anger_management", "frothing_berserker", "tactician", "sudden_death", "executioners_precision"]
+  }
+};
+
+function loadPresetBuild(presetKey) {
+  const preset = SLAYER_PRESETS[presetKey];
+  if (!preset) return;
+  
+  state.targetCount = preset.targetCount;
+  document.getElementById("target-count-select").value = preset.targetCount;
+  state.activeTalents = new Set(preset.talents);
+  
+  renderTalentChips();
+  resetCombat();
+}
+
+function toggleTalentChip(talentId) {
+  if (state.activeTalents.has(talentId)) {
+    state.activeTalents.delete(talentId);
+  } else {
+    state.activeTalents.add(talentId);
+  }
+  renderTalentChips();
+}
+
+function renderTalentChips() {
+  const container = document.getElementById("talent-chips-container");
+  container.innerHTML = "";
+  for (let key in TALENT_REGISTRY) {
+    const tItem = TALENT_REGISTRY[key];
+    const chip = document.createElement("div");
+    const isActive = state.activeTalents.has(tItem.id);
+    const displayName = currentLang === "en" ? tItem.name_en : tItem.name_es;
+    chip.className = `talent-chip ${isActive ? "active" : ""}`;
+    chip.innerText = `${isActive ? "✓ " : ""}${displayName}`;
+    chip.onclick = () => toggleTalentChip(tItem.id);
+    container.appendChild(chip);
+  }
+}
+
+// ==========================================
+// 5. BASE DE DATOS DE HABILIDADES
+// ==========================================
+const SPELL_DB = {
+  CS: { id: "CS", name: "Colossus Smash", cdBase: 45, scalesWithHaste: false, rageCost: 0, rageGen: 0, triggersGCD: true },
+  MS: { id: "MS", name: "Mortal Strike", cdBase: 6, scalesWithHaste: true, rageCost: 30, rageGen: 0, triggersGCD: true },
+  OP: { id: "OP", name: "Overpower", cdBase: 12, scalesWithHaste: true, maxCharges: 2, rageCost: 0, rageGen: 10, triggersGCD: true },
+  CLEAVE: { id: "CLEAVE", name: "Cleave", cdBase: 6, scalesWithHaste: true, rageCost: 20, rageGen: 0, triggersGCD: true },
+  BS: { id: "BS", name: "Bladestorm", cdBase: 90, scalesWithHaste: false, rageCost: 0, rageGen: 20, triggersGCD: true, isChanneled: true, channelDuration: 4.3 },
+  SS: { id: "SS", name: "Sweeping Strikes", cdBase: 30, scalesWithHaste: false, rageCost: 0, rageGen: 0, triggersGCD: true },
+  SLAM: { id: "SLAM", name: "Slam", cdBase: 0, scalesWithHaste: false, rageCost: 20, rageGen: 0, triggersGCD: true },
+  HS: { id: "HS", name: "Heroic Strike", cdBase: 0, scalesWithHaste: false, rageCost: 20, rageGen: 0, triggersGCD: true },
+  AVATAR: { id: "AVATAR", name: "Avatar", cdBase: 90, scalesWithHaste: false, rageCost: 0, rageGen: 0, triggersGCD: false },
+  EXECUTE: { id: "EXECUTE", name: "Execute", cdBase: 0, scalesWithHaste: false, rageCost: 20, rageGen: 0, triggersGCD: true }
+};
+
+let userSlots = [
+  { spellId: "CS", key: "1" },
+  { spellId: "MS", key: "2" },
+  { spellId: "OP", key: "3" },
+  { spellId: "CLEAVE", key: "4" },
+  { spellId: "BS", key: "5" },
+  { spellId: "SS", key: "Q" },
+  { spellId: "SLAM", key: "E" },
+  { spellId: "AVATAR", key: "R" },
+  { spellId: "EXECUTE", key: "F" }
+];
+
+let isEditMode = false;
+let editingSlotIndex = null;
+
+let state = {
+  targetCount: 1, // 1 (ST), 2 (Cleave), 3 (3+ AoE)
+  targetHP: 100,
+  rage: 40,
+  stats: { haste: 31.0, crit: 27.2, mastery: 21.7, vers: 4.5 },
+  activeTalents: new Set(["bloodletting", "sudden_death", "executioners_precision", "dreadnaught", "unhinged", "anger_management", "frothing_berserker", "tactician"]),
+  gcdRemaining: 0,
+  gcdTotal: 1.14,
+  gcdBecameReadyAt: 0,
+  swingTimer: 2.186,
+  swingTotal: 2.186,
+  simulatedPing: 40,
+  spellQueueWindow: 0.40,
+  queuedSpell: null,
+  cds: { CS: 0, MS: 0, CLEAVE: 0, BS: 0, SS: 0, AVATAR: 0 },
+  opCharges: 2,
+  opRecharge: 0,
+  channeling: null,
+  auras: { 
+    colossusSmash: 0, 
+    rendDot: 0, 
+    avatar: 0, 
+    overpowerBuff: 0, 
+    imminentDemise: 0, 
+    executionersPrecision: 0, 
+    sweepingStrikesCharges: 0,
+    sweepingStrikesTimer: 0,
+    suddenDeath: false, 
+    heroicStrike: false 
+  },
+  score: 0,
+  combo: 0,
+  maxCombo: 0,
+  totalCasts: 0,
+  perfectCasts: 0,
+  combatActive: false,
+  combatPaused: false,
+  combatTime: 0,
+  rageCapTime: 0,
+  rendUptimeAccum: 0,
+  gcdIdleAccum: 0,
+  successfulCasts: 0,
+  wastedProcsCount: 0,
+  msHeldTime: 0,
+  rendDownTime: 0,
+  wastedPrecisionStacks: 0,
+  mistakeOccurrences: {},
+  totalMistakes: 0,
+  allCastLogs: [],
+  activeTimelineFilter: null
+};
+
+function getSpellCDMax(spellId) {
+  const spell = SPELL_DB[spellId];
+  if (!spell) return 0;
+  if (spell.scalesWithHaste) {
+    const hasteFactor = 1 + (state.stats.haste / 100);
+    return spell.cdBase / hasteFactor;
+  }
+  return spell.cdBase;
+}
+
+function recalculateDerivedStats() {
+  const hasteFactor = 1 + (state.stats.haste / 100);
+  state.gcdTotal = Math.max(0.75, 1.5 / hasteFactor);
+  state.swingTotal = 2.86 / hasteFactor;
+  if (!state.combatActive) state.swingTimer = state.swingTotal;
+  document.getElementById("gcd-val-text").innerText = state.gcdTotal.toFixed(2) + "s";
+  document.getElementById("swing-val-text").innerText = state.swingTotal.toFixed(2) + "s";
+}
+
+function updateStats() {
+  state.stats.haste = parseFloat(document.getElementById("stat-haste").value) || 0;
+  state.stats.crit = parseFloat(document.getElementById("stat-crit").value) || 0;
+  state.stats.mastery = parseFloat(document.getElementById("stat-mastery").value) || 0;
+  state.stats.vers = parseFloat(document.getElementById("stat-vers").value) || 0;
+  recalculateDerivedStats();
+}
+
+function updatePing(val) {
+  const p = parseInt(val);
+  state.simulatedPing = isNaN(p) ? 0 : Math.max(0, p);
+}
+
+function updateSQW(val) {
+  const s = parseInt(val);
+  state.spellQueueWindow = isNaN(s) ? 0.40 : Math.max(0, s / 1000);
+}
+
+function updateCombatScenario() {
+  state.targetCount = parseInt(document.getElementById("target-count-select").value) || 1;
+  state.targetHP = parseInt(document.getElementById("dummy-hp").value) || 100;
+  resetCombat();
+}
+
+function triggerFCT(text, color = "#facc15") {
+  const layer = document.getElementById("fct-layer");
+  const el = document.createElement("div");
+  el.className = "fct-text";
+  el.innerText = text;
+  el.style.color = color;
+  el.style.left = `calc(50% + ${(Math.random() * 120 - 60)}px)`;
+  el.style.top = `calc(52% + ${(Math.random() * 40 - 20)}px)`;
+  layer.appendChild(el);
+  setTimeout(() => el.remove(), 850);
+}
+
+function togglePauseCombat() {
+  if (!state.combatActive) return;
+  state.combatPaused = !state.combatPaused;
+  const btn = document.getElementById("btn-pause-toggle");
+  if (state.combatPaused) {
+    btn.innerText = t("btnResume");
+    btn.classList.add("btn-active");
+    updateHUD(t("hudPaused"), "#eab308");
+    renderMostCommonProblems();
+  } else {
+    btn.innerText = t("btnPause");
+    btn.classList.remove("btn-active");
+    updateHUD(t("hudResumed"), "var(--perfect)");
+  }
+}
+
+function toggleEditMode() {
+  isEditMode = !isEditMode;
+  const btn = document.getElementById("btn-edit-mode");
+  const addBtn = document.getElementById("btn-add-slot");
+  if (isEditMode) {
+    btn.classList.add("btn-active");
+    btn.innerText = t("btnFinishEdit");
+    addBtn.style.display = "inline-block";
+  } else {
+    btn.classList.remove("btn-active");
+    btn.innerText = t("btnEditBar");
+    addBtn.style.display = "none";
+  }
+  buildActionBarUI();
+}
+
+function addNewSlot() {
+  userSlots.push({ spellId: "SLAM", key: "?" });
+  buildActionBarUI();
+}
+
+function removeSlot(idx) {
+  userSlots.splice(idx, 1);
+  buildActionBarUI();
+}
+
+function moveSlot(idx, dir) {
+  const target = idx + dir;
+  if (target < 0 || target >= userSlots.length) return;
+  const temp = userSlots[idx];
+  userSlots[idx] = userSlots[target];
+  userSlots[target] = temp;
+  buildActionBarUI();
+}
+
+function openEditSlotModal(idx) {
+  editingSlotIndex = idx;
+  const slot = userSlots[idx];
+  const select = document.getElementById("modal-spell-select");
+  select.innerHTML = "";
+  for (let key in SPELL_DB) {
+    const opt = document.createElement("option");
+    opt.value = key;
+    opt.innerText = SPELL_DB[key].name;
+    if (key === slot.spellId) opt.selected = true;
+    select.appendChild(opt);
+  }
+
+  const keyInput = document.getElementById("modal-key-input");
+  keyInput.value = slot.key;
+  keyInput.onkeydown = (e) => {
+    e.preventDefault();
+    keyInput.value = e.key.toUpperCase();
+  };
+
+  document.getElementById("slot-modal").style.display = "flex";
+}
+
+function closeModal() {
+  document.getElementById("slot-modal").style.display = "none";
+  editingSlotIndex = null;
+}
+
+function saveModalConfig() {
+  if (editingSlotIndex === null) return;
+  const spellId = document.getElementById("modal-spell-select").value;
+  const key = document.getElementById("modal-key-input").value.trim() || "?";
+  userSlots[editingSlotIndex] = { spellId, key };
+  closeModal();
+  buildActionBarUI();
+}
+
+function buildActionBarUI() {
+  const container = document.getElementById("action-bar");
+  container.innerHTML = "";
+
+  userSlots.forEach((slot, idx) => {
+    const spell = SPELL_DB[slot.spellId];
+    if (!spell) return;
+
+    const slotEl = document.createElement("div");
+    slotEl.className = "action-slot";
+    slotEl.id = `slot-dom-${idx}`;
+
+    if (!isEditMode) {
+      slotEl.onclick = () => triggerCast(slot.key);
+    }
+
+    slotEl.innerHTML = `
+      <span class="keybind">${slot.key}</span>
+      <span class="spell-name" id="name-dom-${idx}">${spell.name}</span>
+      ${spell.rageCost > 0 ? `<span class="cost">${spell.rageCost}</span>` : ""}
+      <span class="charges" id="charge-dom-${idx}"></span>
+      <div class="radial-cd-overlay" id="radial-dom-${idx}"></div>
+      <div class="cd-number" id="num-dom-${idx}"></div>
+      ${isEditMode ? `
+        <div class="slot-edit-tools">
+          <button onclick="openEditSlotModal(${idx})">${currentLang === "en" ? "Edit" : "Editar"}</button>
+          <div style="display: flex; gap: 2px;">
+            <button onclick="moveSlot(${idx}, -1)">◀</button>
+            <button onclick="moveSlot(${idx}, 1)">▶</button>
+            <button onclick="removeSlot(${idx})" style="background:#991b1b;">✕</button>
+          </div>
+        </div>
+      ` : ""}
+    `;
+    container.appendChild(slotEl);
+  });
+}
+
+function resetCombat() {
+  state.targetCount = parseInt(document.getElementById("target-count-select").value) || 1;
+  state.targetHP = parseInt(document.getElementById("dummy-hp").value) || 100;
+  state.rage = 40;
+  state.gcdRemaining = 0;
+  state.gcdBecameReadyAt = performance.now();
+  state.swingTimer = state.swingTotal;
+  state.channeling = null;
+  state.queuedSpell = null;
+  state.cds = { CS: 0, MS: 0, CLEAVE: 0, BS: 0, SS: 0, AVATAR: 0 };
+  state.opCharges = 2;
+  state.opRecharge = 0;
+  state.auras = { 
+    colossusSmash: 0, 
+    rendDot: 0, 
+    avatar: 0, 
+    overpowerBuff: 0, 
+    imminentDemise: 0, 
+    executionersPrecision: 0, 
+    sweepingStrikesCharges: 0,
+    sweepingStrikesTimer: 0,
+    suddenDeath: false, 
+    heroicStrike: false 
+  };
+  state.score = 0;
+  state.combo = 0;
+  state.totalCasts = 0;
+  state.perfectCasts = 0;
+  state.combatActive = false;
+  state.combatPaused = false;
+  state.combatTime = 0;
+  state.rageCapTime = 0;
+  state.rendUptimeAccum = 0;
+  state.gcdIdleAccum = 0;
+  state.successfulCasts = 0;
+  
+  state.wastedProcsCount = 0;
+  state.msHeldTime = 0;
+  state.rendDownTime = 0;
+  state.wastedPrecisionStacks = 0;
+  state.mistakeOccurrences = {};
+  state.totalMistakes = 0;
+  state.allCastLogs = [];
+  state.activeTimelineFilter = null;
+
+  const btnPause = document.getElementById("btn-pause-toggle");
+  btnPause.innerText = t("btnPause");
+  btnPause.classList.remove("btn-active");
+
+  updateTargetScenarioText();
+  document.getElementById("combat-clock").innerText = "00:00";
+  document.getElementById("log-container").innerHTML = "";
+  document.getElementById("channel-wrapper").style.display = "none";
+  document.getElementById("filter-wrapper").style.display = "none";
+  updateStatsUI();
+  updateAnalyzerUI();
+  updateScoreUI(0, 0, "-");
+  renderMostCommonProblems();
+  updateHUD(t("hudPromptStart"), "#94a3b8");
+}
+
+// ==========================================
+// 6. EVALUADOR APL SLAYER (SIMC V12.1.0)
+// ==========================================
+function evaluateAPL() {
+  if (state.channeling) return null;
+
+  const enemies = state.targetCount;
+  const hasMassacre = state.activeTalents.has("massacre");
+  const hasBloodletting = state.activeTalents.has("bloodletting");
+  const hasSuddenDeath = state.activeTalents.has("sudden_death");
+  const hasFervor = state.activeTalents.has("fervor_of_battle") && enemies >= 2;
+  const isExecutePhase = (hasMassacre && state.targetHP <= 35) || state.targetHP <= 20;
+
+  // 1. actions.slayer_aoe (active_enemies >= 3 and not execute)[cite: 1]
+  if (enemies >= 3 && !isExecutePhase) {
+    if (state.auras.rendDot <= 0 && state.cds.CLEAVE <= 0 && state.rage >= SPELL_DB.CLEAVE.rageCost) return "CLEAVE";
+    if (state.cds.SS <= 0 && state.auras.sweepingStrikesCharges <= 0) return "SS";
+    if (state.cds.AVATAR <= 0) return "AVATAR";
+    if (state.auras.suddenDeath && state.cds.CS < 2) return "EXECUTE";
+    if (state.cds.CS <= 0) return "CS";
+    if (state.cds.BS <= 0) return "BS";
+    if (state.cds.CLEAVE <= 0 && state.rage >= SPELL_DB.CLEAVE.rageCost) return "CLEAVE";
+    if (state.opCharges === 2 && state.activeTalents.has("dreadnaught")) return "OP";
+    if (state.auras.suddenDeath && hasSuddenDeath) return "EXECUTE";
+    if (state.opCharges > 0 && state.activeTalents.has("dreadnaught")) return "OP";
+    if (state.rage >= 20 && isExecutePhase) return "EXECUTE";
+    if (state.cds.MS <= 0 && state.rage >= SPELL_DB.MS.rageCost) return "MS";
+    if (!hasFervor && state.rage >= 40) return "SLAM";
+  }
+  // 2. actions.slayer_execute[cite: 1]
+  else if (isExecutePhase) {
+    if (enemies >= 2 && state.cds.SS <= 0 && state.auras.sweepingStrikesCharges <= 0) return "SS";
+    if (!hasBloodletting && state.auras.rendDot < 2 && state.cds.CLEAVE <= 0 && state.rage >= SPELL_DB.CLEAVE.rageCost) return "CLEAVE";
+    if ((state.auras.colossusSmash > 0 || (state.cds.CS < 10 && state.cds.CS > state.gcdTotal)) && state.cds.AVATAR <= 0) return "AVATAR";
+    if (state.cds.CS <= 0) return "CS";
+    if (!hasFervor && state.auras.heroicStrike && state.rage >= SPELL_DB.HS.rageCost) return "HS";
+    if ((state.auras.colossusSmash > 0 || state.auras.avatar > 0 || state.cds.CS > 25 || state.auras.executionersPrecision === 2) && state.cds.BS <= 0) return "BS";
+    if (state.auras.executionersPrecision === 2 && state.cds.MS <= 0 && state.rage >= SPELL_DB.MS.rageCost) return "MS";
+    if (state.auras.suddenDeath && hasSuddenDeath) return "EXECUTE";
+    if (state.rage > 40) return "EXECUTE";
+    if (state.opCharges > 0) return "OP";
+    if (state.rage >= 20) return "EXECUTE";
+  }
+  // 3. actions.slayer_st[cite: 1]
+  else {
+    if (enemies === 2 && state.cds.SS <= 0 && state.auras.sweepingStrikesCharges <= 0) return "SS";
+    if (state.auras.rendDot <= state.gcdTotal && state.cds.CLEAVE <= 0 && state.rage >= SPELL_DB.CLEAVE.rageCost) return "CLEAVE";
+    if (state.cds.CS < 2 && state.auras.rendDot <= 10 && state.cds.CLEAVE <= 0 && state.rage >= SPELL_DB.CLEAVE.rageCost) return "CLEAVE";
+    if ((state.auras.colossusSmash > 0 || (state.cds.CS < 10 && state.cds.CS > state.gcdTotal)) && state.cds.AVATAR <= 0) return "AVATAR";
+    if (state.auras.suddenDeath && hasSuddenDeath && state.cds.CS > 0 && state.cds.CS <= state.gcdTotal) return "EXECUTE";
+    if (state.cds.CS <= 0) return "CS";
+    if ((state.auras.colossusSmash > 0 || state.auras.avatar > 0 || state.cds.CS > 25) && state.cds.BS <= 0) return "BS";
+    if (!hasFervor && state.auras.heroicStrike && state.rage >= SPELL_DB.HS.rageCost) return "HS";
+    if (state.cds.MS <= 0 && state.rage >= SPELL_DB.MS.rageCost) return "MS";
+    if (state.auras.suddenDeath && hasSuddenDeath) return "EXECUTE";
+    if (state.opCharges > 0) return "OP";
+    if (enemies === 2 && state.cds.CLEAVE <= 0 && state.rage >= SPELL_DB.CLEAVE.rageCost) return "CLEAVE";
+    if (state.auras.rendDot <= 4.5 && state.cds.CLEAVE <= 0 && state.rage >= SPELL_DB.CLEAVE.rageCost) return "CLEAVE";
+    if (state.rage >= 40) return "SLAM";
+  }
+  return null;
+}
+
+// ==========================================
+// 7. GESTOR DE ENTRADA CON TOLERANCIA DE SPAM
+// ==========================================
+function triggerCast(keyChar) {
+  if (isEditMode || state.combatPaused) return;
+  const slot = userSlots.find(s => s.key.toUpperCase() === keyChar.toUpperCase());
+  if (!slot) return;
+
+  let effectiveSpellId = slot.spellId;
+  if (slot.spellId === "SLAM" && state.auras.heroicStrike) {
+    effectiveSpellId = "HS";
+  }
+
+  const spell = SPELL_DB[effectiveSpellId];
+  if (!spell) return;
+
+  userSlots.forEach((s, idx) => {
+    if (s.key.toUpperCase() === keyChar.toUpperCase()) {
+      const el = document.getElementById(`slot-dom-${idx}`);
+      if (el) {
+        el.classList.add("pressed");
+        setTimeout(() => el.classList.remove("pressed"), 100);
+      }
+    }
+  });
+
+  setTimeout(() => {
+    handleIncomingCast(spell);
+  }, state.simulatedPing);
+}
+
+function handleIncomingCast(spell) {
+  const now = new Date().toLocaleTimeString();
+
+  // CancelAura for Bladestorm
+  if (state.channeling && state.channeling.name === "Bladestorm" && spell.id === "BS") {
+    state.channeling = null;
+    playAudioFeedback("good");
+    addLogEntry(now, "CancelAura: Bladestorm", "channel", currentLang === "en" ? "Channeling cancelled manually" : "Canalización interrumpida manualmente", { spell, status: "channel" });
+    updateHUD(currentLang === "en" ? "Bladestorm cancelled manually" : "Bladestorm cancelado manualmente", "var(--channel)");
+    return;
+  }
+
+  const inLockout = (spell.triggersGCD && state.gcdRemaining > 0) || state.channeling !== null;
+  const lockoutRemaining = state.channeling ? state.channeling.remaining : state.gcdRemaining;
+
+  // Inside Spell Queue Window (SQW)
+  if (inLockout && lockoutRemaining <= state.spellQueueWindow) {
+    state.queuedSpell = { spell, queuedInSQW: true };
+    updateHUD(`[${t("auraQueue")}] ${spell.name} (${(lockoutRemaining * 1000).toFixed(0)}ms)`, "var(--queue)");
+    return;
+  }
+
+  // Outside SQW (Hard lockout)
+  if (inLockout && lockoutRemaining > state.spellQueueWindow) {
+    return;
+  }
+
+  processSpellCast(spell, false);
+}
+
+function classifyMistake(castSpellId, idealSpellId) {
+  if (idealSpellId === "SS" && castSpellId !== "SS") return "SKIPPED_SWEEPING_STRIKES";
+  if (idealSpellId === "CLEAVE" && state.targetCount >= 3 && castSpellId !== "CLEAVE") return "SKIPPED_AOE_CLEAVE";
+  if (idealSpellId === "BS" && castSpellId !== "BS") return "DELAYED_BURST_CD";
+  if (idealSpellId === "HS" && castSpellId !== "HS") return "SKIPPED_HEROIC_STRIKE";
+  if (castSpellId === "EXECUTE" && state.auras.executionersPrecision === 2) return "OVERSTACKED_PRECISION";
+  if (castSpellId === "MS" && (state.targetHP <= 20 || (state.activeTalents.has("massacre") && state.targetHP <= 35)) && state.auras.executionersPrecision < 2) return "EARLY_MS_EXECUTE";
+  if (idealSpellId === "MS" && (castSpellId === "SLAM" || castSpellId === "CLEAVE")) return "DELAYED_MORTAL_STRIKE";
+  if (idealSpellId === "CLEAVE" && state.auras.rendDot <= 4.5) return "DROPPED_REND";
+  if ((idealSpellId === "CS" || idealSpellId === "AVATAR") && (castSpellId === "SLAM" || castSpellId === "OP")) return "DELAYED_BURST_CD";
+  if (state.auras.suddenDeath && castSpellId !== "EXECUTE") return "SKIPPED_SUDDEN_DEATH";
+  if (castSpellId === "SLAM" && idealSpellId !== "SLAM") return "UNNECESSARY_FILLER";
+  return "GENERAL_SUBOPTIMAL";
+}
+
+function processSpellCast(spell, fromQueue = false) {
+  const now = new Date().toLocaleTimeString();
+
+  if (!state.combatActive) {
+    state.combatActive = true;
+    state.combatPaused = false;
+    state.gcdBecameReadyAt = performance.now();
+    addLogEntry(
+      now, 
+      currentLang === "en" ? "Combat Started" : "Inicio de Combate", 
+      "perfect", 
+      currentLang === "en" ? "Timers and Scoring Initialized" : "Cronómetro, Swing Timer y Puntuación iniciados", 
+      { spell, status: "perfect" }
+    );
+  }
+
+  let reactionMs = 0;
+  let timingGrade = "PERFECT";
+
+  if (fromQueue) {
+    reactionMs = 0;
+    timingGrade = "PERFECT";
+  } else {
+    reactionMs = Math.max(0, Math.round(performance.now() - state.gcdBecameReadyAt));
+    if (reactionMs <= 75) timingGrade = "PERFECT";
+    else if (reactionMs <= 180) timingGrade = "GOOD";
+    else timingGrade = "LATE";
+  }
+
+  const idealSpellId = evaluateAPL();
+  const inCD = spell.id === "OP" ? state.opCharges === 0 : (state.cds[spell.id] && state.cds[spell.id] > 0);
+  const noRage = !state.auras.suddenDeath && state.rage < spell.rageCost;
+  const isExecuteThreshold = (state.activeTalents.has("massacre") && state.targetHP <= 35) || state.targetHP <= 20;
+  const invalidExecute = spell.id === "EXECUTE" && !isExecuteThreshold && !state.auras.suddenDeath;
+
+  let status = "perfect";
+  let message = "";
+  let errorType = null;
+
+  if (inCD) {
+    status = "error";
+    message = currentLang === "en" ? `Failed: ${spell.name} on Cooldown` : `Falló: ${spell.name} en Cooldown`;
+    errorType = "GENERAL_SUBOPTIMAL";
+  } else if (noRage) {
+    status = "error";
+    message = currentLang === "en" ? `Failed: Insufficient Rage (${Math.round(state.rage)}/${spell.rageCost})` : `Falló: Furia insuficiente (${Math.round(state.rage)}/${spell.rageCost})`;
+    errorType = "UNNECESSARY_FILLER";
+  } else if (invalidExecute) {
+    status = "error";
+    message = currentLang === "en" ? `Failed: Target above Execute range` : `Falló: Objetivo fuera de rango de Execute`;
+    errorType = "GENERAL_SUBOPTIMAL";
+  } else if (spell.id !== idealSpellId) {
+    status = "suboptimal";
+    const idealName = idealSpellId ? SPELL_DB[idealSpellId].name : (currentLang === "en" ? "Wait resource" : "Esperar recurso");
+    message = currentLang === "en" ? `Suboptimal: APL demanded [${idealName}]` : `Subóptimo: APL pedía [${idealName}]`;
+    errorType = classifyMistake(spell.id, idealSpellId);
+  } else {
+    status = "perfect";
+    message = currentLang === "en" ? `¡${timingGrade}! Optimal APL sequence (${reactionMs}ms)` : `¡${timingGrade}! Secuencia APL óptima (${reactionMs}ms)`;
+  }
+
+  if (status === "perfect") {
+    state.combo++;
+    state.maxCombo = Math.max(state.maxCombo, state.combo);
+    const multiplier = 1 + Math.floor(state.combo / 5) * 0.5;
+    const basePoints = timingGrade === "PERFECT" ? 100 : timingGrade === "GOOD" ? 65 : 35;
+    const addedScore = Math.round(basePoints * multiplier);
+    state.score += addedScore;
+
+    playAudioFeedback(timingGrade.toLowerCase());
+    triggerFCT(`+${addedScore} ${timingGrade}`, timingGrade === "PERFECT" ? "#22c55e" : timingGrade === "GOOD" ? "#38bdf8" : "#f59e0b");
+    updateScoreUI(state.score, state.combo, `${reactionMs}ms (${timingGrade})`);
+  } else {
+    state.combo = 0;
+    playAudioFeedback("error");
+    triggerFCT(status === "suboptimal" ? (currentLang === "en" ? "SUBOPTIMAL" : "SUBÓPTIMO") : "MISS", "#ef4444");
+    updateScoreUI(state.score, 0, status.toUpperCase());
+
+    if (errorType) {
+      state.totalMistakes++;
+      state.mistakeOccurrences[errorType] = (state.mistakeOccurrences[errorType] || 0) + 1;
+    }
+  }
+
+  if (status !== "error") {
+    let spent = spell.rageCost;
+    if (spell.id === "EXECUTE" && state.auras.suddenDeath) spent = 0;
+
+    state.rage = Math.min(100, Math.max(0, state.rage - spent + spell.rageGen));
+    state.successfulCasts++;
+
+    if (spent > 0) {
+      dispatchTalentHook("onRageSpent", spent, state, (title, type, desc) => addLogEntry(now, title, type, desc));
+    }
+
+    if (spell.id === "EXECUTE") {
+      state.rage = Math.min(100, state.rage + 2.15);
+      state.auras.imminentDemise = Math.min(10, state.auras.imminentDemise + 1);
+      if (state.cds.BS > 0) {
+        state.cds.BS = Math.max(0, state.cds.BS - 3.5);
+        addLogEntry(now, "CDR: Bladestorm", "cdr", currentLang === "en" ? "-3.5s by Execute cast" : "-3.5s por lanzamiento de Execute");
+      }
+    }
+
+    // Consumo de cargas de Sweeping Strikes (habilidades Single Target o Cleave con Fervor of Battle)
+    const consumesSS = ["MS", "OP", "EXECUTE", "SLAM", "HS"].includes(spell.id) || 
+                       (spell.id === "CLEAVE" && state.activeTalents.has("fervor_of_battle"));
+    if (consumesSS && state.auras.sweepingStrikesCharges > 0 && state.targetCount >= 2) {
+      state.auras.sweepingStrikesCharges--;
+      if (state.auras.sweepingStrikesCharges <= 0) {
+        state.auras.sweepingStrikesTimer = 0;
+      }
+    }
+
+    dispatchTalentHook("onSpellCast", spell, state, (title, type, desc) => addLogEntry(now, title, type, desc));
+
+    if (spell.triggersGCD) state.gcdRemaining = state.gcdTotal;
+
+    if (spell.id === "CS") {
+      state.cds.CS = getSpellCDMax("CS");
+      state.auras.colossusSmash = 10;
+    } else if (spell.id === "MS") {
+      state.cds.MS = getSpellCDMax("MS");
+      state.auras.overpowerBuff = 0;
+    } else if (spell.id === "OP") {
+      state.opCharges--;
+      if (state.opCharges < 2 && state.opRecharge <= 0) state.opRecharge = getSpellCDMax("OP");
+      state.auras.overpowerBuff = Math.min(2, state.auras.overpowerBuff + 1);
+    } else if (spell.id === "CLEAVE") {
+      state.cds.CLEAVE = getSpellCDMax("CLEAVE");
+      const baseRend = 15;
+      const pandemicThreshold = 4.5;
+      const rollover = Math.min(pandemicThreshold, Math.max(0, state.auras.rendDot));
+      state.auras.rendDot = baseRend + rollover;
+    } else if (spell.id === "SS") {
+      state.cds.SS = getSpellCDMax("SS");
+      const current = state.auras.sweepingStrikesCharges;
+      const toAdd = 12;
+      const newTotal = Math.min(18, current + toAdd);
+      const gained = newTotal - current;
+      state.auras.sweepingStrikesCharges = newTotal;
+      state.auras.sweepingStrikesTimer = 30.0;
+      triggerFCT(`+${gained} SS Charges`, "#e11d48");
+      addLogEntry(
+        now, 
+        "Sweeping Strikes", 
+        "perfect", 
+        currentLang === "en" ? `+${gained} charges gained (${newTotal}/18 max)` : `+${gained} cargas obtenidas (${newTotal}/18 máx)`
+      );
+    } else if (spell.id === "BS") {
+      state.cds.BS = getSpellCDMax("BS");
+      state.auras.imminentDemise = 0;
+      state.channeling = {
+        name: "Bladestorm",
+        total: spell.channelDuration,
+        remaining: spell.channelDuration,
+        unhingedCastsDone: 0
+      };
+    } else if (spell.id === "AVATAR") {
+      state.cds.AVATAR = getSpellCDMax("AVATAR");
+      state.auras.avatar = 20;
+    } else if (spell.id === "HS") {
+      state.auras.heroicStrike = false;
+    } else if (spell.id === "EXECUTE") {
+      if (state.auras.suddenDeath) state.auras.suddenDeath = false;
+    }
+  }
+
+  state.totalCasts++;
+  if (status === "perfect") state.perfectCasts++;
+
+  const auditData = {
+    spell: spell.name,
+    ideal: idealSpellId ? SPELL_DB[idealSpellId].name : (currentLang === "en" ? "None" : "Ninguno"),
+    timing: `${reactionMs}ms (${timingGrade})`,
+    errorType: errorType,
+    errorPattern: errorType ? getErrorTaxonomyTitle(errorType) : t("optimalSequence"),
+    rage: `${Math.round(state.rage)}/100`,
+    rend: `${state.auras.rendDot.toFixed(1)}s`,
+    precision: state.auras.executionersPrecision,
+    reason: errorType ? getErrorTaxonomyTip(errorType) : t("optimalDiagnosis")
+  };
+
+  addLogEntry(now, spell.name, status === "perfect" ? timingGrade.toLowerCase() : status, message, auditData);
+  updateHUD(message, status === "perfect" ? "var(--perfect)" : status === "suboptimal" ? "var(--suboptimal)" : "var(--error)");
+  updateStatsUI();
+  renderMostCommonProblems();
+}
+
+function updateHUD(text, color) {
+  const hud = document.getElementById("hud-feedback");
+  hud.innerText = text;
+  hud.style.color = color;
+}
+
+function updateScoreUI(score, combo, timingStr) {
+  document.getElementById("score-val").innerText = score;
+  const mult = (1 + Math.floor(combo / 5) * 0.5).toFixed(1);
+  document.getElementById("combo-val").innerText = `x${combo} (${mult}x)`;
+  document.getElementById("timing-val").innerText = timingStr;
+  const gradeEl = document.getElementById("grade-val");
+  if (combo > 15) { gradeEl.innerText = t("gradeGodlike"); gradeEl.style.color = "#ec4899"; }
+  else if (combo > 8) { gradeEl.innerText = t("gradeGreat"); gradeEl.style.color = "#22c55e"; }
+  else if (combo > 0) { gradeEl.innerText = t("gradeRhythm"); gradeEl.style.color = "#38bdf8"; }
+  else { gradeEl.innerText = t("gradeBroken"); gradeEl.style.color = "#ef4444"; }
+}
+
+function addLogEntry(time, spellName, statusClass, reason, auditData = null) {
+  const logObj = { time, spellName, statusClass, reason, auditData };
+  state.allCastLogs.unshift(logObj);
+  renderTimelineView();
+}
+
+function renderTimelineView() {
+  const container = document.getElementById("log-container");
+  container.innerHTML = "";
+
+  const logsToDisplay = state.activeTimelineFilter 
+    ? state.allCastLogs.filter(l => l.auditData && l.auditData.errorType === state.activeTimelineFilter)
+    : state.allCastLogs;
+
+  logsToDisplay.slice(0, 80).forEach(log => {
+    const entry = document.createElement("div");
+    entry.className = `log-entry ${log.statusClass}`;
+    entry.innerHTML = `<span><strong>[${log.time}]</strong> ${log.spellName}</span><span>${log.reason} 🔍</span>`;
+    if (log.auditData) {
+      entry.onclick = () => openAuditModal(log.auditData);
+    }
+    container.appendChild(entry);
+  });
+}
+
+function filterTimelineByError(errorTypeId) {
+  state.activeTimelineFilter = errorTypeId;
+  document.getElementById("filter-wrapper").style.display = "flex";
+  document.getElementById("filter-label").innerText = `${t("filterActive")}: ${getErrorTaxonomyTitle(errorTypeId).substring(0, 30)}...`;
+  renderTimelineView();
+}
+
+function clearTimelineFilter() {
+  state.activeTimelineFilter = null;
+  document.getElementById("filter-wrapper").style.display = "none";
+  renderTimelineView();
+}
+
+function openAuditModal(data) {
+  document.getElementById("audit-spell").innerText = data.spell;
+  document.getElementById("audit-ideal").innerText = data.ideal;
+  document.getElementById("audit-timing").innerText = data.timing;
+  document.getElementById("audit-pattern").innerText = data.errorType ? getErrorTaxonomyTitle(data.errorType) : t("optimalSequence");
+  document.getElementById("audit-state").innerText = `${t("rageLabel")}: ${data.rage} | Rend: ${data.rend} | Precision x${data.precision} | SS: ${state.auras.sweepingStrikesCharges > 0 ? state.auras.sweepingStrikesCharges + ' charges' : 'None'}`;
+  document.getElementById("audit-reason").innerText = data.errorType ? getErrorTaxonomyTip(data.errorType) : t("optimalDiagnosis");
+  document.getElementById("audit-modal").style.display = "flex";
+}
+
+function closeAuditModal() {
+  document.getElementById("audit-modal").style.display = "none";
+}
+
+function updateStatsUI() {
+  document.getElementById("total-casts").innerText = state.totalCasts;
+  const rate = state.totalCasts > 0 ? Math.round((state.perfectCasts / state.totalCasts) * 100) : 100;
+  document.getElementById("accuracy-rate").innerText = rate + "%";
+}
+
+function renderMostCommonProblems() {
+  const container = document.getElementById("problems-container");
+  if (state.totalMistakes === 0) {
+    if (state.totalCasts > 5) {
+      container.innerHTML = `<div style="color: #22c55e; font-weight: bold; text-align: center; padding: 10px;">${t("flawlessProblems")}</div>`;
+    } else {
+      container.innerHTML = `<div style="color: #64748b; font-style: italic; font-size: 0.8rem; text-align: center; padding: 12px;">${t("emptyProblems")}</div>`;
+    }
+    return;
+  }
+
+  const sortedErrors = Object.keys(state.mistakeOccurrences)
+    .sort((a, b) => state.mistakeOccurrences[b] - state.mistakeOccurrences[a]);
+
+  container.innerHTML = sortedErrors.map(errKey => {
+    const count = state.mistakeOccurrences[errKey];
+    const pct = Math.round((count / state.totalMistakes) * 100);
+    const title = getErrorTaxonomyTitle(errKey);
+
+    return `
+      <div class="problem-card">
+        <div class="problem-info">
+          <div class="problem-title">${title}</div>
+          <div class="problem-bar-wrapper">
+            <span>${pct}% ${t("ofMistakes")} (${count}x)</span>
+            <div class="problem-bar-bg">
+              <div class="problem-bar-fill" style="width: ${pct}%;"></div>
+            </div>
+          </div>
+        </div>
+        <button class="btn-show-me" onclick="filterTimelineByError('${errKey}')">${t("showMe")}</button>
+      </div>
+    `;
+  }).join("");
+}
+
+function updateAnalyzerUI() {
+  const badge = document.getElementById("combat-status-badge");
+  if (!state.combatActive) {
+    badge.className = "stats-badge status-badge-idle";
+    badge.innerText = t("statusIdle");
+  } else if (state.combatPaused) {
+    badge.className = "stats-badge status-badge-paused";
+    badge.innerText = t("statusPaused");
+  } else {
+    badge.className = "stats-badge status-badge-combat";
+    badge.innerText = t("statusCombat");
+  }
+
+  if (state.combatTime <= 0) return;
+
+  const apm = ((state.successfulCasts / state.combatTime) * 60).toFixed(1);
+  document.getElementById("analyzer-apm").innerText = apm;
+
+  document.getElementById("analyzer-wasted-procs").innerText = state.wastedProcsCount;
+  document.getElementById("analyzer-ms-held").innerText = state.msHeldTime.toFixed(1) + "s";
+  document.getElementById("analyzer-rend-down").innerText = state.rendDownTime.toFixed(1) + "s";
+
+  const mins = Math.floor(state.combatTime / 60).toString().padStart(2, '0');
+  const secs = Math.floor(state.combatTime % 60).toString().padStart(2, '0');
+  document.getElementById("combat-clock").innerText = `${mins}:${secs}`;
+}
+
+// Game Loop
+let lastTick = performance.now();
+function gameLoop(now) {
+  const dt = (now - lastTick) / 1000;
+  lastTick = now;
+
+  if (state.combatActive && !state.combatPaused) {
+    state.combatTime += dt;
+    if (state.rage >= 99.5) state.rageCapTime += dt;
+    if (state.auras.rendDot > 0) state.rendUptimeAccum += dt;
+    else state.rendDownTime += dt;
+    
+    if (state.cds.MS <= 0 && state.rage >= SPELL_DB.MS.rageCost && !state.channeling && state.targetHP > 20 && state.targetCount === 1) {
+      state.msHeldTime += dt;
+    }
+
+    if (state.gcdRemaining <= 0 && !state.channeling) state.gcdIdleAccum += dt;
+
+    // Sweeping Strikes 30s Expiration
+    if (state.auras.sweepingStrikesTimer > 0) {
+      state.auras.sweepingStrikesTimer -= dt;
+      if (state.auras.sweepingStrikesTimer <= 0) {
+        state.auras.sweepingStrikesCharges = 0;
+      }
+    }
+
+    // Bladestorm Channeling Tick
+    if (state.channeling) {
+      state.channeling.remaining -= dt;
+      const nowTime = new Date().toLocaleTimeString();
+
+      dispatchTalentHook("onChannelTick", state.channeling, state, dt, (title, type, desc) => addLogEntry(nowTime, title, type, desc));
+
+      if (state.channeling.remaining <= 0) {
+        state.channeling = null;
+        state.gcdBecameReadyAt = performance.now();
+        addLogEntry(nowTime, "Bladestorm Finalizado", "channel", currentLang === "en" ? "Channeling completed" : "Canalización completada");
+      }
+    }
+
+    if (state.gcdRemaining > 0) {
+      state.gcdRemaining = Math.max(0, state.gcdRemaining - dt);
+      if (state.gcdRemaining <= 0) {
+        state.gcdBecameReadyAt = performance.now();
+      }
+    }
+
+    if (state.gcdRemaining <= 0 && !state.channeling && state.queuedSpell) {
+      const spellToExecute = state.queuedSpell.spell;
+      const wasSQW = state.queuedSpell.queuedInSQW;
+      state.queuedSpell = null;
+      processSpellCast(spellToExecute, wasSQW);
+    }
+
+    for (let key in state.cds) {
+      if (state.cds[key] > 0) state.cds[key] = Math.max(0, state.cds[key] - dt);
+    }
+
+    if (state.opCharges < 2) {
+      state.opRecharge -= dt;
+      if (state.opRecharge <= 0) {
+        state.opCharges++;
+        state.opRecharge = state.opCharges < 2 ? getSpellCDMax("OP") : 0;
+      }
+    }
+
+    if (state.auras.colossusSmash > 0) state.auras.colossusSmash = Math.max(0, state.auras.colossusSmash - dt);
+    if (state.auras.rendDot > 0) state.auras.rendDot = Math.max(0, state.auras.rendDot - dt);
+    if (state.auras.avatar > 0) state.auras.avatar = Math.max(0, state.auras.avatar - dt);
+
+    // Auto-Attacks
+    if (!state.channeling) {
+      state.swingTimer -= dt;
+      if (state.swingTimer <= 0) {
+        state.swingTimer = state.swingTotal;
+        const isCrit = Math.random() < (state.stats.crit / 100);
+        const rageGained = isCrit ? 31.3 : 11.8;
+        
+        state.rage = Math.min(100, state.rage + rageGained);
+        triggerFCT(`+${Math.round(rageGained)} ${t("rageLabel")}`, isCrit ? "#ef4444" : "#94a3b8");
+        dispatchTalentHook("onAutoAttack", state, isCrit);
+        
+        if (Math.random() < 0.16) {
+          if (state.auras.heroicStrike) {
+            state.wastedProcsCount++;
+          }
+          state.auras.heroicStrike = true;
+          playAudioFeedback("proc");
+          triggerFCT("¡HEROIC STRIKE!", "#38bdf8");
+        }
+      }
+    }
+  }
+
+  // Peripheral Screen Vignettes
+  const body = document.body;
+  if (state.auras.colossusSmash > 0 || state.auras.avatar > 0) {
+    body.className = "vignette-burst";
+  } else if (state.targetHP <= 20) {
+    body.className = "vignette-execute";
+  } else if (state.auras.suddenDeath || state.auras.heroicStrike) {
+    body.className = "vignette-proc";
+  } else {
+    body.className = "";
+  }
+
+  renderUI();
+  updateAnalyzerUI();
+  requestAnimationFrame(gameLoop);
+}
+
+function renderUI() {
+  document.getElementById("rage-bar").style.width = state.rage + "%";
+  document.getElementById("rage-text").innerText = `${t("rageLabel")}: ${Math.round(state.rage)} / 100`;
+
+  const channelWrapper = document.getElementById("channel-wrapper");
+  const channelBar = document.getElementById("channel-bar");
+  const channelText = document.getElementById("channel-text");
+  if (state.channeling) {
+    channelWrapper.style.display = "flex";
+    const chPct = (state.channeling.remaining / state.channeling.total) * 100;
+    channelBar.style.width = chPct + "%";
+    const bsKey = userSlots.find(s=>s.spellId==='BS')?.key || '5';
+    channelText.innerText = `${t("channelingBS")} ${state.channeling.remaining.toFixed(1)}s (${currentLang === "en" ? "Press" : "Presiona"} ${bsKey} ${t("channelCancelHint")})`;
+  } else {
+    channelWrapper.style.display = "none";
+  }
+
+  const gcdPct = (state.gcdRemaining / state.gcdTotal) * 100;
+  document.getElementById("gcd-bar").style.width = gcdPct + "%";
+
+  const swingPct = state.combatActive ? ((state.swingTotal - state.swingTimer) / state.swingTotal) * 100 : 100;
+  document.getElementById("swing-bar").style.width = swingPct + "%";
+
+  // Auras
+  const aurasList = document.getElementById("auras-list");
+  aurasList.innerHTML = "";
+  if (state.queuedSpell) aurasList.innerHTML += `<div class="aura-pill aura-queue">${t("auraQueue")}: ${state.queuedSpell.spell.name}</div>`;
+  if (state.channeling) aurasList.innerHTML += `<div class="aura-pill aura-channel">${t("auraChannel")} ${state.channeling.name}</div>`;
+  if (state.auras.sweepingStrikesCharges > 0) aurasList.innerHTML += `<div class="aura-pill aura-ss">Sweeping Strikes x${state.auras.sweepingStrikesCharges} (${state.auras.sweepingStrikesTimer.toFixed(1)}s)</div>`;
+  if (state.auras.colossusSmash > 0) aurasList.innerHTML += `<div class="aura-pill aura-active">Colossus Smash: ${state.auras.colossusSmash.toFixed(1)}s</div>`;
+  if (state.auras.rendDot > 0) aurasList.innerHTML += `<div class="aura-pill aura-active">Rend (${state.auras.rendDot.toFixed(1)}s)</div>`;
+  if (state.auras.avatar > 0) aurasList.innerHTML += `<div class="aura-pill aura-active">Avatar: ${state.auras.avatar.toFixed(1)}s</div>`;
+  if (state.auras.overpowerBuff > 0) aurasList.innerHTML += `<div class="aura-pill aura-active">Overpower Buff x${state.auras.overpowerBuff}</div>`;
+  if (state.auras.imminentDemise > 0) aurasList.innerHTML += `<div class="aura-pill aura-demise">Imminent Demise x${state.auras.imminentDemise}</div>`;
+  
+  if (state.auras.executionersPrecision > 0) {
+    const isReady = state.auras.executionersPrecision === 2;
+    const readyTag = isReady ? (currentLang === "en" ? "(MS Ready!)" : "(¡MS Listo!)") : "";
+    aurasList.innerHTML += `<div class="aura-pill aura-precision ${isReady ? 'ready' : ''}">Executioner's Precision x${state.auras.executionersPrecision} ${readyTag}</div>`;
+  }
+
+  if (state.auras.suddenDeath) aurasList.innerHTML += `<div class="aura-pill aura-proc">${t("auraProcSD")}</div>`;
+  if (state.auras.heroicStrike) aurasList.innerHTML += `<div class="aura-pill aura-proc" style="background:#0284c7; border-color:#38bdf8;">${t("auraProcHS")}</div>`;
+
+  // Action Bar Glow / Cooldowns
+  const idealSpellId = evaluateAPL();
+
+  userSlots.forEach((slot, idx) => {
+    let effectiveSpellId = slot.spellId;
+    if (slot.spellId === "SLAM" && state.auras.heroicStrike) {
+      effectiveSpellId = "HS";
+    }
+
+    const spell = SPELL_DB[effectiveSpellId];
+    if (!spell) return;
+
+    const slotEl = document.getElementById(`slot-dom-${idx}`);
+    const nameEl = document.getElementById(`name-dom-${idx}`);
+    const radialEl = document.getElementById(`radial-dom-${idx}`);
+    const numEl = document.getElementById(`num-dom-${idx}`);
+    const chargeEl = document.getElementById(`charge-dom-${idx}`);
+
+    if (!slotEl || !radialEl || !numEl) return;
+
+    if (nameEl) nameEl.innerText = spell.name;
+
+    slotEl.classList.remove("glow", "proc-heroic", "channel-locked", "channel-canceler", "queued");
+
+    if (state.queuedSpell && state.queuedSpell.spell.id === spell.id) {
+      slotEl.classList.add("queued");
+    } else if (state.channeling) {
+      if (spell.id === "BS") {
+        slotEl.classList.add("channel-canceler");
+      } else {
+        slotEl.classList.add("channel-locked");
+      }
+    } else {
+      if (effectiveSpellId === idealSpellId || (slot.spellId === "SLAM" && idealSpellId === "HS")) {
+        slotEl.classList.add("glow");
+      } else if (effectiveSpellId === "HS") {
+        slotEl.classList.add("proc-heroic");
+      }
+    }
+
+    let cdRemaining = 0;
+    let maxDuration = getSpellCDMax(spell.id) || 1;
+
+    if (spell.id === "SS") {
+      if (chargeEl) {
+        chargeEl.className = "charges ss-badge";
+        chargeEl.innerText = state.auras.sweepingStrikesCharges > 0 ? state.auras.sweepingStrikesCharges : "";
+      }
+      cdRemaining = state.cds.SS || 0;
+      maxDuration = getSpellCDMax("SS");
+    } else if (spell.id === "OP") {
+      if (chargeEl) {
+        chargeEl.className = "charges";
+        chargeEl.innerText = state.opCharges;
+      }
+      if (state.opCharges === 0) {
+        cdRemaining = state.opRecharge;
+        maxDuration = getSpellCDMax("OP");
+      }
+    } else {
+      if (chargeEl) {
+        chargeEl.className = "charges";
+        chargeEl.innerText = "";
+      }
+      if (state.cds[spell.id]) {
+        cdRemaining = state.cds[spell.id];
+        maxDuration = getSpellCDMax(spell.id);
+      }
+    }
+
+    if (cdRemaining > 0) {
+      const fraction = cdRemaining / maxDuration;
+      const deg = fraction * 360;
+      radialEl.style.background = `conic-gradient(rgba(0, 0, 0, 0.78) ${deg}deg, transparent ${deg}deg)`;
+      numEl.innerText = cdRemaining > 2 ? Math.ceil(cdRemaining) : cdRemaining.toFixed(1);
+    } else if (spell.triggersGCD && state.gcdRemaining > 0 && !state.channeling) {
+      const gcdFraction = state.gcdRemaining / state.gcdTotal;
+      const deg = gcdFraction * 360;
+      radialEl.style.background = `conic-gradient(rgba(0, 0, 0, 0.72) ${deg}deg, transparent ${deg}deg)`;
+      numEl.innerText = "";
+    } else {
+      radialEl.style.background = "transparent";
+      numEl.innerText = "";
+    }
+  });
+}
+
+// Global Keyboard Handler
+window.addEventListener("keydown", (e) => {
+  if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT" || isEditMode) return;
+  const key = e.key.toUpperCase();
+  triggerCast(key);
+});
+
+// Initialization
+recalculateDerivedStats();
+setLanguage("en");
+loadPresetBuild("st_1t");
+buildActionBarUI();
+requestAnimationFrame(gameLoop);
+</script>
+</body>
+</html>
