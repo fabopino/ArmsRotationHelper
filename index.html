@@ -3,192 +3,286 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>WoW Rotation Trainer - Warrior Arms Slayer (ST & AoE)</title>
+  <title>WoW Rotation Trainer - Arms Slayer 3D CDM Edition</title>
+  <!-- Three.js CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <style>
     :root {
-      --bg: #090d16;
-      --card: #131b2b;
-      --accent: #c2410c;
+      --bg: #04060a;
+      --card: #0a0f1d;
+      --card-border: #182336;
+      --blizz-blue: #0070de;
+      --blizz-gold: #f8b700;
+      --blizz-hover: rgba(0, 112, 222, 0.25);
+      --blizz-selected: #38bdf8;
       --rage: #ef4444;
       --text: #f8fafc;
-      --border: #233044;
       --perfect: #22c55e;
       --good: #38bdf8;
       --late: #f59e0b;
       --suboptimal: #eab308;
       --error: #ef4444;
       --channel: #a855f7;
-      --cdr: #38bdf8;
       --queue: #f59e0b;
-      --precision: #ec4899;
-      --ss: #e11d48;
+      --slot-size: 54px;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; user-select: none; }
-    body { background-color: var(--bg); color: var(--text); padding: 14px; display: flex; flex-direction: column; align-items: center; min-height: 100vh; position: relative; overflow-x: hidden; }
-    .container { width: 100%; max-width: 980px; display: flex; flex-direction: column; gap: 12px; z-index: 10; }
+    body { background-color: var(--bg); color: var(--text); padding: 12px; display: flex; justify-content: center; min-height: 100vh; overflow-x: hidden; }
 
-    /* Ambient Vignette Overlay */
-    #ambient-vignette {
-      position: fixed; inset: 0; pointer-events: none; z-index: 5; transition: box-shadow 0.3s ease; box-shadow: inset 0 0 0 0 transparent;
+    /* Ambient FX */
+    #ambient-vignette { position: fixed; inset: 0; pointer-events: none; z-index: 50; transition: box-shadow 0.3s ease; box-shadow: inset 0 0 0 0 transparent; }
+    body.vignette-burst #ambient-vignette { box-shadow: inset 0 0 80px 20px rgba(234, 179, 8, 0.35); }
+    body.vignette-execute #ambient-vignette { box-shadow: inset 0 0 80px 20px rgba(239, 68, 68, 0.35); }
+    body.vignette-proc #ambient-vignette { box-shadow: inset 0 0 90px 25px rgba(56, 189, 248, 0.45); }
+
+    /* 3-Column Layout */
+    .app-layout {
+      display: grid;
+      grid-template-columns: 230px 1fr 330px;
+      gap: 12px;
+      width: 100%;
+      max-width: 1740px;
+      align-items: start;
     }
-    body.vignette-burst #ambient-vignette { box-shadow: inset 0 0 60px 15px rgba(234, 179, 8, 0.35); }
-    body.vignette-execute #ambient-vignette { box-shadow: inset 0 0 60px 15px rgba(239, 68, 68, 0.35); }
-    body.vignette-proc #ambient-vignette { box-shadow: inset 0 0 70px 20px rgba(56, 189, 248, 0.45); }
-
-    /* Panels */
-    .card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 12px; }
-    .header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+    .col-left, .col-center, .col-right { display: flex; flex-direction: column; gap: 10px; }
+    .card { background: var(--card); border: 1px solid var(--card-border); border-radius: 8px; padding: 10px; position: relative; }
     
-    /* Config Controls */
-    .controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-    select, input[type="number"], button { 
-      background: #090d16; color: #fff; border: 1px solid var(--border); padding: 5px 8px; border-radius: 4px; font-size: 0.8rem; 
+    /* Left Panel */
+    .panel-title { font-size: 0.82rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #162234; padding-bottom: 5px; margin-bottom: 8px; }
+    .control-group { display: flex; flex-direction: column; gap: 7px; }
+    .control-item { display: flex; flex-direction: column; gap: 2px; font-size: 0.74rem; color: #94a3b8; font-weight: 600; }
+    .control-item-row { display: flex; justify-content: space-between; align-items: center; }
+    select, input[type="number"], input[type="text"] {
+      background: #060911; color: #fff; border: 1px solid #233044; padding: 4px 7px; border-radius: 4px; font-size: 0.76rem; outline: none;
     }
-    input[type="number"] { width: 65px; text-align: center; }
-    button { cursor: pointer; transition: background 0.15s; }
-    button:hover { background: #1f2d45; }
+    select:focus, input:focus { border-color: #38bdf8; }
+    .btn-stack { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+    button {
+      background: #141c2c; color: #fff; border: 1px solid #26354a; padding: 6px 10px; border-radius: 4px;
+      font-size: 0.76rem; font-weight: 700; cursor: pointer; transition: all 0.15s; text-align: center;
+    }
+    button:hover { background: #1d2a42; border-color: #38bdf8; }
     .btn-active { background: #b45309 !important; border-color: #f59e0b !important; }
-    .btn-pause { background: #0369a1; border-color: #38bdf8; }
-    .lang-select { background: #1e293b; border-color: #38bdf8; font-weight: bold; }
-    .preset-select { background: #1e293b; border-color: #f59e0b; color: #fef3c7; font-weight: bold; }
+    .btn-cdm { background: #0284c7; border-color: #38bdf8; }
 
-    /* Score & Timing HUD */
-    .score-hud { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; background: #060911; padding: 8px 12px; border-radius: 6px; }
+    /* Center Top: HUD */
+    .score-hud-wrapper { display: flex; flex-direction: column; gap: 6px; }
+    .score-hud { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; background: #060911; padding: 6px 12px; border-radius: 6px; }
     .score-box { display: flex; flex-direction: column; align-items: center; }
-    .score-box-label { font-size: 0.68rem; color: #94a3b8; font-weight: bold; text-transform: uppercase; }
-    .score-box-val { font-size: 1.15rem; font-weight: 800; }
-
-    /* Floating Combat Text Layer */
-    #fct-layer { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 30; }
-    .fct-text {
-      position: absolute; font-weight: 900; font-size: 1.1rem; text-shadow: 0 0 4px #000, 2px 2px 2px #000;
-      animation: fctFloat 0.85s cubic-bezier(0.1, 0.8, 0.3, 1) forwards;
-    }
-    @keyframes fctFloat {
-      0% { opacity: 1; transform: translateY(0) scale(0.85); }
-      20% { transform: translateY(-12px) scale(1.15); }
-      100% { opacity: 0; transform: translateY(-45px) scale(0.95); }
-    }
-
-    /* Stats Grid */
-    .stats-panel { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; background: #060911; padding: 8px 12px; border-radius: 6px; }
-    .stat-box { display: flex; align-items: center; justify-content: space-between; font-size: 0.75rem; }
-    .stat-box label { color: #94a3b8; font-weight: 600; }
-    .stat-input-group { display: flex; align-items: center; gap: 2px; }
-    .stat-input-group input { width: 50px; padding: 2px 4px; font-weight: bold; }
-
-    .talents-panel { display: flex; flex-direction: column; gap: 8px; background: #060911; padding: 10px 12px; border-radius: 6px; font-size: 0.78rem; }
-    .talent-header-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
-    .talent-chips-grid { display: flex; gap: 6px; flex-wrap: wrap; }
-    .talent-chip {
-      padding: 3px 8px; border-radius: 12px; font-size: 0.7rem; font-weight: 600; cursor: pointer;
-      background: #1e293b; border: 1px solid #334155; color: #94a3b8; transition: all 0.15s;
-    }
-    .talent-chip.active { background: #1e3a8a; border-color: #3b82f6; color: #93c5fd; }
-
-    /* Target & Info */
-    .target-bar { display: flex; justify-content: space-between; align-items: center; background: #00000040; padding: 6px 12px; border-radius: 6px; }
-    .stats-badge { background: #233044; padding: 3px 8px; border-radius: 10px; font-weight: bold; font-size: 0.78rem; }
-    .status-badge-idle { background: #475569; color: #cbd5e1; }
-    .status-badge-combat { background: #991b1b; color: #fecaca; }
-    .status-badge-paused { background: #854d0e; color: #fef08a; }
-
-    /* Resource Bars & Dual Timers */
-    .resource-container { display: flex; flex-direction: column; gap: 5px; }
-    .bar-bg { background: #000; height: 20px; border-radius: 4px; overflow: hidden; position: relative; border: 1px solid #334155; }
-    .bar-fill { height: 100%; transition: width 0.04s linear; }
-    .bar-text { position: absolute; width: 100%; text-align: center; font-size: 11px; line-height: 20px; font-weight: bold; top: 0; text-shadow: 1px 1px 2px #000; }
-    .rage-fill { background: linear-gradient(90deg, #991b1b, #ef4444); width: 0%; }
+    .score-box-label { font-size: 0.62rem; color: #94a3b8; font-weight: 800; text-transform: uppercase; }
+    .score-box-val { font-size: 1.1rem; font-weight: 900; }
     
-    .channel-bar-wrapper { display: none; flex-direction: column; gap: 2px; }
-    .channel-bar-bg { background: #000; height: 14px; border-radius: 3px; overflow: hidden; position: relative; border: 1px solid var(--channel); }
-    .channel-fill { background: linear-gradient(90deg, #7e22ce, #c084fc); width: 100%; height: 100%; }
-    .channel-text { position: absolute; width: 100%; text-align: center; font-size: 10px; line-height: 14px; font-weight: bold; top: 0; text-shadow: 1px 1px 2px #000; }
+    .results-ticker {
+      display: flex; align-items: center; gap: 6px; background: #060911; padding: 4px 10px;
+      border-radius: 6px; border: 1px solid #162032; overflow-x: auto; min-height: 28px;
+    }
+    .results-label { font-size: 0.65rem; font-weight: 800; color: #64748b; text-transform: uppercase; white-space: nowrap; }
+    .result-pill {
+      font-size: 0.66rem; font-weight: 800; padding: 2px 6px; border-radius: 3px; white-space: nowrap;
+      border: 1px solid transparent; animation: fadeIn 0.2s ease;
+    }
+    .result-pill.perfect { background: #064e3b; border-color: #059669; color: #6ee7b7; }
+    .result-pill.good { background: #0c4a6e; border-color: #0284c7; color: #7dd3fc; }
+    .result-pill.late { background: #78350f; border-color: #d97706; color: #fde68a; }
+    .result-pill.suboptimal, .result-pill.error { background: #7f1d1d; border-color: #dc2626; color: #fca5a5; }
 
-    .dual-timers { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-    .sub-bar-wrapper { display: flex; flex-direction: column; gap: 2px; }
-    .sub-bar-label { font-size: 0.7rem; color: #94a3b8; display: flex; justify-content: space-between; }
-    .sub-bar-bg { background: #090d16; height: 5px; border-radius: 2px; overflow: hidden; border: 1px solid #1e293b; }
-    .gcd-fill { background: #facc15; width: 0%; height: 100%; }
-    .swing-fill { background: #38bdf8; width: 0%; height: 100%; }
+    /* Main Game Viewport */
+    .game-window-card {
+      position: relative; width: 100%; height: 580px; padding: 0; overflow: hidden;
+      border: 1px solid var(--card-border); border-radius: 8px; background: #050711;
+      cursor: crosshair;
+    }
+    #threejs-canvas-layer { width: 100%; height: 100%; position: absolute; inset: 0; z-index: 1; display: block; }
+    #fallback-2d-canvas { width: 100%; height: 100%; position: absolute; inset: 0; z-index: 1; display: block; }
 
-    /* Auras */
-    .auras { display: flex; gap: 6px; min-height: 26px; flex-wrap: wrap; }
-    .aura-pill { padding: 2px 7px; border-radius: 4px; font-size: 0.72rem; font-weight: bold; display: flex; align-items: center; gap: 4px; border: 1px solid transparent; }
-    .aura-active { background: #1e3a8a; border-color: #3b82f6; }
-    .aura-proc { background: #854d0e; border-color: #eab308; animation: pulse 1s infinite alternate; }
-    .aura-channel { background: #581c87; border-color: #c084fc; animation: pulse 0.7s infinite alternate; }
-    .aura-demise { background: #4c1d95; border-color: #a78bfa; }
-    .aura-precision { background: #831843; border-color: var(--precision); color: #fdf2f8; }
-    .aura-precision.ready { animation: pulse 0.8s infinite alternate; border-color: #f472b6; }
-    .aura-ss { background: #881337; border-color: var(--ss); color: #ffe4e6; }
-    .aura-queue { background: #78350f; border-color: #f59e0b; color: #fef3c7; }
+    body.cdm-edit-mode .game-window-card {
+      background-size: 20px 20px;
+      background-image: 
+        linear-gradient(to right, rgba(255,255,255,0.05) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255,255,255,0.05) 1px, transparent 1px);
+    }
 
-    /* Action Bar */
-    .action-bar-wrapper { display: flex; flex-direction: column; gap: 8px; position: relative; }
-    .action-bar { display: flex; flex-wrap: wrap; gap: 8px; min-height: 70px; align-items: center; }
+    .game-ui-overlay { position: absolute; inset: 0; pointer-events: none; z-index: 10; }
+
+    .in-game-header {
+      position: absolute; top: 8px; left: 12px; right: 12px; display: flex;
+      justify-content: space-between; align-items: center; pointer-events: none;
+    }
+    .in-game-badge {
+      background: rgba(10, 15, 29, 0.85); backdrop-filter: blur(4px); border: 1px solid #1e293b;
+      padding: 4px 10px; border-radius: 5px; font-size: 0.75rem; font-weight: bold; color: #cbd5e1;
+    }
+    .range-pill { padding: 3px 10px; border-radius: 5px; font-size: 0.72rem; font-weight: 800; }
+    .range-in { background: rgba(6, 78, 59, 0.9); color: #34d399; border: 1px solid #059669; }
+    .range-out { background: rgba(127, 29, 29, 0.9); color: #f87171; border: 1px solid #ef4444; animation: pulse 0.5s infinite alternate; }
+
+    .hud-feedback {
+      position: absolute; top: 44px; left: 50%; transform: translateX(-50%);
+      font-size: 0.88rem; font-weight: 800; color: #94a3b8; text-shadow: 0 0 6px #000, 1px 1px 2px #000;
+      pointer-events: none; text-align: center; white-space: nowrap; transition: color 0.15s;
+    }
+
+    /* Floating CDM Frames */
+    .cdm-frame {
+      position: absolute; cursor: default; transition: box-shadow 0.15s; transform-origin: top left;
+      display: flex; flex-direction: column; pointer-events: auto; z-index: 20;
+    }
+
+    .cdm-drag-handle {
+      display: none; align-items: center; justify-content: space-between;
+      background: #0284c7; color: #fff; font-size: 0.62rem; font-weight: 800;
+      padding: 3px 6px; border-radius: 4px 4px 0 0; cursor: grab; text-transform: uppercase;
+      letter-spacing: 0.3px; box-shadow: 0 2px 6px rgba(0,0,0,0.7);
+    }
+    .cdm-drag-handle:active { cursor: grabbing; }
+    body.cdm-edit-mode .cdm-drag-handle { display: flex; }
+
+    body.cdm-edit-mode .cdm-frame {
+      outline: 1px dashed rgba(56, 189, 248, 0.5);
+      outline-offset: 2px;
+      padding: 2px;
+      border-radius: 6px;
+      background: rgba(15, 23, 42, 0.6);
+      backdrop-filter: blur(2px);
+    }
+    body.cdm-edit-mode .cdm-frame:hover {
+      outline: 2px solid var(--blizz-blue);
+      background: rgba(0, 112, 222, 0.3);
+    }
+    body.cdm-edit-mode .cdm-frame.cdm-selected {
+      outline: 2px solid var(--blizz-gold) !important;
+      background: rgba(248, 183, 0, 0.15) !important;
+      box-shadow: 0 0 20px rgba(248, 183, 0, 0.4);
+      z-index: 500 !important;
+    }
+    body.cdm-edit-mode .cdm-frame.is-dragging { cursor: grabbing; opacity: 0.85; z-index: 600 !important; }
+
+    .cdm-slot-container {
+      display: flex; gap: 6px; min-width: 54px; min-height: 54px; border-radius: 5px; transition: background 0.15s; padding: 2px;
+    }
+    .cdm-slot-container.orientation-horizontal { flex-direction: row; }
+    .cdm-slot-container.orientation-vertical { flex-direction: column; }
+    
+    .cdm-slot-container.drag-over { background: rgba(56, 189, 248, 0.3); outline: 2px dashed #38bdf8; }
+
     .action-slot {
-      width: 62px; height: 62px; background: #090d16; border: 2px solid #334155; border-radius: 6px;
+      width: var(--slot-size); height: var(--slot-size); background: #000; border: 2px solid #334155; border-radius: 6px;
       position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center;
-      cursor: pointer; overflow: hidden; transition: transform 0.05s, border-color 0.15s, opacity 0.15s;
+      cursor: pointer; overflow: hidden; transition: transform 0.05s, border-color 0.15s, box-shadow 0.15s;
     }
+    body.cdm-edit-mode .action-slot { cursor: grab; }
+    body.cdm-edit-mode .action-slot:active { cursor: grabbing; }
     .action-slot:active, .action-slot.pressed { transform: scale(0.92); }
-    .action-slot.glow { border-color: #facc15; box-shadow: 0 0 10px rgba(250, 204, 21, 0.7); }
-    .action-slot.proc-heroic { border-color: #38bdf8; box-shadow: 0 0 12px rgba(56, 189, 248, 0.8); }
-    .action-slot.channel-locked { opacity: 0.45; filter: grayscale(0.5); }
-    .action-slot.channel-canceler { border-color: #c084fc; box-shadow: 0 0 10px rgba(192, 132, 252, 0.8); }
-    .action-slot.queued { border-color: #f59e0b; box-shadow: 0 0 12px rgba(245, 158, 11, 0.9); }
+    .slot-icon-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; pointer-events: none; }
     
-    .radial-cd-overlay { position: absolute; inset: 0; pointer-events: none; border-radius: 4px; z-index: 2; }
+    .action-slot.out-of-range .slot-icon-img { filter: sepia(0.8) hue-rotate(310deg) saturate(3) brightness(0.65); }
+    .action-slot.out-of-range::before { content: "•"; position: absolute; top: 2px; right: 4px; color: #ef4444; font-size: 1.4rem; line-height: 1; z-index: 5; }
+
+    .action-slot.glow { border-color: #facc15; box-shadow: 0 0 12px rgba(250, 204, 21, 0.9); }
+    .action-slot.glow::after { content: ""; position: absolute; inset: 0; border: 2px solid #facc15; animation: pulse 0.8s infinite alternate; z-index: 4; pointer-events: none; }
+    .action-slot.proc-heroic { border-color: #38bdf8; box-shadow: 0 0 12px rgba(56, 189, 248, 0.9); animation: pulse 0.7s infinite alternate; }
+    .action-slot.proc-sd { border-color: #eab308; box-shadow: 0 0 12px rgba(234, 179, 8, 0.9); animation: pulse 0.7s infinite alternate; }
+    .action-slot.channel-locked { opacity: 0.35; filter: grayscale(0.8); }
+    .action-slot.channel-canceler { border-color: #c084fc; box-shadow: 0 0 10px rgba(192, 132, 252, 0.9); }
+    .action-slot.queued { border-color: #f59e0b; box-shadow: 0 0 10px rgba(245, 158, 11, 0.9); }
+    
+    .radial-cd-overlay { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
     .cd-number {
       position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-      font-weight: 800; font-size: 1.1rem; color: #ffffff; text-shadow: 0 0 4px #000, 1px 1px 2px #000; z-index: 3; pointer-events: none;
+      font-weight: 900; font-size: 1.15rem; color: #ffffff; text-shadow: 0 0 4px #000, 1px 1px 2px #000; z-index: 3; pointer-events: none;
     }
-
-    .keybind { position: absolute; top: 2px; left: 3px; font-size: 0.72rem; font-weight: bold; color: #f1f5f9; background: #000000bd; padding: 1px 4px; border-radius: 3px; z-index: 4; }
-    .cost { position: absolute; bottom: 2px; right: 3px; font-size: 0.68rem; color: #f87171; font-weight: bold; z-index: 4; }
-    .charges { position: absolute; top: 2px; right: 3px; font-size: 0.72rem; font-weight: bold; color: #38bdf8; z-index: 4; }
+    .keybind {
+      position: absolute; top: 2px; left: 2px; font-size: 0.65rem; font-weight: 800;
+      color: #fff; background: rgba(0, 0, 0, 0.85); padding: 1px 3px; border-radius: 3px; z-index: 4;
+      text-transform: uppercase; border: 1px solid rgba(255,255,255,0.15); max-width: 52px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; pointer-events: none;
+    }
+    .cost { position: absolute; bottom: 2px; right: 3px; font-size: 0.68rem; color: #f87171; font-weight: 900; z-index: 4; text-shadow: 0 0 3px #000; pointer-events: none; }
+    .charges { position: absolute; top: 2px; right: 2px; font-size: 0.72rem; font-weight: 900; color: #38bdf8; z-index: 4; text-shadow: 0 0 3px #000; pointer-events: none; }
+    .charges.sd-badge { color: #fef08a; background: #713f12; padding: 0 3px; border-radius: 3px; border: 1px solid #eab308; }
     .charges.ss-badge { color: #f43f5e; background: #4c0519; padding: 0 3px; border-radius: 3px; border: 1px solid #e11d48; }
-    .spell-name { font-size: 0.62rem; text-align: center; font-weight: 600; padding: 2px; line-height: 1.1; color: #cbd5e1; z-index: 1; word-break: break-word; }
 
-    .slot-edit-tools {
-      position: absolute; inset: 0; background: rgba(15, 23, 42, 0.94); z-index: 5;
-      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+    .slot-gear-btn {
+      position: absolute; bottom: 2px; left: 2px; font-size: 0.65rem; background: rgba(15, 23, 42, 0.85);
+      color: #38bdf8; border: 1px solid #0284c7; border-radius: 3px; padding: 1px 3px; cursor: pointer;
+      display: none; z-index: 10;
     }
-    .slot-edit-tools button { padding: 2px 5px; font-size: 0.65rem; border: 1px solid #475569; }
+    .slot-gear-btn:hover { background: #0284c7; color: #fff; }
+    body.cdm-edit-mode .slot-gear-btn { display: block; }
 
-    .hud-feedback { text-align: center; font-size: 0.95rem; font-weight: bold; min-height: 22px; transition: color 0.1s; }
-
-    /* Diagnostic Panels */
-    .analyzer-panel { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 8px; background: #060911; padding: 10px; border-radius: 6px; }
-    .analyzer-card { background: #131b2b; border: 1px solid #233044; border-radius: 6px; padding: 8px; display: flex; flex-direction: column; gap: 3px; }
-    .analyzer-title { font-size: 0.7rem; color: #94a3b8; font-weight: bold; text-transform: uppercase; }
-    .analyzer-val { font-size: 1.1rem; font-weight: bold; color: #f8fafc; }
-    .analyzer-sub { font-size: 0.68rem; color: #64748b; }
-
-    /* Most Common Problems Box */
-    .problems-container { display: flex; flex-direction: column; gap: 8px; background: #060911; padding: 10px; border-radius: 6px; border: 1px solid #233044; }
-    .problem-card {
-      background: #131b2b; border: 1px solid #334155; border-radius: 6px; padding: 10px 12px;
-      display: flex; justify-content: space-between; align-items: center; gap: 12px;
+    /* Resource and Channeling Bars */
+    .resource-container { display: flex; flex-direction: column; gap: 4px; }
+    .resource-bar-wrapper {
+      background: #000; border: 1px solid #334155; border-radius: 4px; position: relative; overflow: hidden;
+      display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0,0,0,0.8);
     }
-    .problem-info { display: flex; flex-direction: column; gap: 6px; flex: 1; }
-    .problem-title { font-size: 0.8rem; color: #f8fafc; line-height: 1.3; font-weight: 500; }
-    .problem-bar-wrapper { display: flex; align-items: center; gap: 8px; font-size: 0.72rem; color: #94a3b8; font-weight: bold; }
-    .problem-bar-bg { width: 140px; height: 7px; background: #1e293b; border-radius: 3px; overflow: hidden; }
-    .problem-bar-fill { height: 100%; background: #ef4444; }
-    .btn-show-me {
-      background: #1e293b; border: 1px solid #475569; color: #f8fafc; padding: 6px 12px;
-      border-radius: 4px; font-size: 0.75rem; font-weight: bold; white-space: nowrap; transition: all 0.15s;
-    }
-    .btn-show-me:hover { background: #334155; border-color: #38bdf8; }
+    .resource-bar-wrapper.orientation-horizontal { width: 260px; height: 22px; }
+    .resource-bar-wrapper.orientation-vertical { width: 22px; height: 160px; }
 
-    /* Timeline Log & Filter */
-    .log-header-row { display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; font-weight: bold; }
-    .filter-indicator { background: #991b1b; color: #fef2f2; padding: 2px 8px; border-radius: 4px; font-size: 0.72rem; display: flex; align-items: center; gap: 6px; }
-    .log-container { height: 150px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; background: #05080e; padding: 8px; border-radius: 6px; font-family: monospace; font-size: 0.78rem; }
-    .log-entry { display: flex; justify-content: space-between; padding: 4px 8px; border-radius: 4px; background: #101623; border-left: 4px solid #64748b; cursor: pointer; transition: background 0.1s; }
-    .log-entry:hover { background: #1b263b; }
+    .resource-fill { position: absolute; background: linear-gradient(90deg, #991b1b, #ef4444); }
+    .resource-bar-wrapper.orientation-horizontal .resource-fill { left: 0; top: 0; bottom: 0; width: 40%; height: 100%; }
+    .resource-bar-wrapper.orientation-vertical .resource-fill {
+      bottom: 0; left: 0; right: 0; width: 100%; height: 40%;
+      background: linear-gradient(0deg, #991b1b, #ef4444);
+    }
+    .resource-text { position: relative; z-index: 2; font-size: 0.72rem; font-weight: 900; text-shadow: 0 0 3px #000; }
+    .resource-bar-wrapper.orientation-vertical .resource-text { writing-mode: vertical-rl; transform: rotate(180deg); }
+
+    .channel-bar-wrapper {
+      display: none; flex-direction: column; width: 100%; min-width: 200px;
+    }
+    .channel-bar-bg {
+      background: #000; height: 16px; border-radius: 3px; overflow: hidden; position: relative;
+      border: 1px solid var(--channel); box-shadow: 0 0 10px rgba(168, 85, 247, 0.4);
+    }
+    .channel-fill { background: linear-gradient(90deg, #7e22ce, #c084fc); width: 100%; height: 100%; transition: width 0.04s linear; }
+    .channel-text {
+      position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+      font-size: 0.68rem; font-weight: 900; text-shadow: 0 0 3px #000; color: #fff;
+    }
+
+    /* Auras */
+    .auras-flex { display: flex; gap: 6px; padding: 2px; }
+    .auras-flex.orientation-vertical { flex-direction: column; }
+    .aura-icon-frame {
+      width: 38px; height: 38px; position: relative; border-radius: 4px; overflow: hidden; border: 2px solid #334155;
+      background: #000; box-shadow: 0 2px 6px rgba(0,0,0,0.8);
+    }
+    .aura-icon-img { width: 100%; height: 100%; object-fit: cover; }
+    .aura-timer-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 0.74rem; font-weight: 900; color: #fff; text-shadow: 0 0 3px #000; }
+    .aura-stacks-badge { position: absolute; bottom: 0; right: 2px; font-size: 0.72rem; font-weight: 900; color: #facc15; text-shadow: 0 0 3px #000; }
+    .aura-border-proc { border-color: #facc15; box-shadow: 0 0 8px rgba(250, 204, 21, 0.8); animation: pulse 0.7s infinite alternate; }
+    .aura-border-blue { border-color: #38bdf8; box-shadow: 0 0 8px rgba(56, 189, 248, 0.8); }
+    .aura-border-pandemic { border-color: #ef4444; animation: pulse 0.5s infinite alternate; }
+
+    /* Inspector */
+    #cdm-inspector {
+      position: absolute; width: 240px; background: #0f172a; border: 1px solid var(--blizz-selected);
+      border-radius: 8px; padding: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.85);
+      z-index: 1100; display: none; flex-direction: column; gap: 10px;
+    }
+    .inspector-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155; padding-bottom: 4px; }
+    .inspector-title { font-size: 0.78rem; font-weight: 800; color: var(--blizz-gold); text-transform: uppercase; }
+    .inspector-row { display: flex; justify-content: space-between; align-items: center; font-size: 0.74rem; color: #cbd5e1; }
+    .inspector-row input[type="range"] { width: 110px; cursor: pointer; }
+
+    /* Right Panel */
+    .metrics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .metric-box { background: #060911; border: 1px solid #182336; border-radius: 5px; padding: 6px 8px; display: flex; flex-direction: column; gap: 2px; }
+    .metric-val { font-size: 1rem; font-weight: 800; color: #f8fafc; }
+    .metric-sub { font-size: 0.62rem; color: #64748b; }
+
+    .talents-grid-scroll { display: grid; grid-template-columns: 1fr; gap: 5px; max-height: 250px; overflow-y: auto; padding-right: 2px; }
+    .talent-node {
+      background: #060911; border: 1px solid #1e293b; border-radius: 5px; padding: 5px 7px;
+      display: flex; flex-direction: column; gap: 2px; cursor: pointer; transition: all 0.15s;
+    }
+    .talent-node:hover { border-color: #38bdf8; }
+    .talent-node.active { background: #0f1f38; border-color: #3b82f6; }
+    .talent-node-title { font-size: 0.72rem; font-weight: 800; color: #f8fafc; display: flex; justify-content: space-between; }
+    .talent-node-desc { font-size: 0.62rem; color: #94a3b8; line-height: 1.15; }
+
+    .log-container { height: 260px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; background: #05080e; padding: 6px; border-radius: 6px; font-family: monospace; font-size: 0.72rem; }
+    .log-entry { display: flex; justify-content: space-between; padding: 3px 6px; border-radius: 3px; background: #0d1422; border-left: 3px solid #64748b; cursor: pointer; }
     .log-entry.perfect { border-color: var(--perfect); }
     .log-entry.good { border-color: var(--good); }
     .log-entry.late { border-color: var(--late); }
@@ -196,15 +290,25 @@
     .log-entry.error { border-color: var(--error); }
     .log-entry.channel { border-color: var(--channel); }
 
-    /* Modal */
-    .modal-backdrop {
-      position: fixed; inset: 0; background: rgba(0,0,0,0.75); display: none; align-items: center; justify-content: center; z-index: 60;
+    /* FCT Layer */
+    #fct-layer { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 40; }
+    .fct-text {
+      position: absolute; font-weight: 900; font-size: 1.15rem; text-shadow: 0 0 4px #000, 2px 2px 3px #000;
+      animation: fctFloat 0.85s cubic-bezier(0.1, 0.8, 0.3, 1) forwards;
     }
-    .modal-box { background: #1e293b; border: 1px solid #475569; border-radius: 8px; padding: 16px; width: 400px; display: flex; flex-direction: column; gap: 10px; }
-    .audit-row { display: flex; justify-content: space-between; font-size: 0.8rem; border-bottom: 1px solid #334155; padding-bottom: 4px; }
-    .audit-reason-box { background: #090d16; border: 1px solid #334155; border-radius: 4px; padding: 8px; font-size: 0.78rem; line-height: 1.35; color: #93c5fd; }
+    @keyframes fctFloat {
+      0% { opacity: 1; transform: translateY(0) scale(0.85); }
+      20% { transform: translateY(-12px) scale(1.2); }
+      100% { opacity: 0; transform: translateY(-45px) scale(0.95); }
+    }
+    @keyframes fadeIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+    @keyframes pulse { from { opacity: 0.7; transform: scale(0.98); } to { opacity: 1; transform: scale(1.02); } }
 
-    @keyframes pulse { from { opacity: 0.8; } to { opacity: 1; filter: drop-shadow(0 0 4px #eab308); } }
+    /* Modals */
+    .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.85); display: none; align-items: center; justify-content: center; z-index: 2000; }
+    .modal-box { background: #131d2e; border: 1px solid #334155; border-radius: 8px; padding: 14px; width: 420px; display: flex; flex-direction: column; gap: 8px; }
+    .audit-row { display: flex; justify-content: space-between; font-size: 0.78rem; border-bottom: 1px solid #1e293b; padding-bottom: 3px; }
+    .audit-reason-box { background: #060911; border: 1px solid #1e293b; border-radius: 4px; padding: 6px; font-size: 0.74rem; line-height: 1.3; color: #93c5fd; }
   </style>
 </head>
 <body>
@@ -212,1254 +316,1382 @@
 <div id="ambient-vignette"></div>
 <div id="fct-layer"></div>
 
-<div class="container">
-  <!-- Header / Controls -->
-  <div class="card header">
-    <div>
-      <h2 style="font-size: 1.15rem;" id="ui-title">Rotation Trainer: Warrior Arms Slayer</h2>
-      <div style="font-size: 0.75rem; color: #94a3b8;" id="ui-subtitle">SimC APL v12.1.0 + ST / 2-Target Cleave / 3+ Target AoE + Fervor of Battle</div>
-    </div>
-    <div class="controls">
-      <select id="lang-select" class="lang-select" onchange="setLanguage(this.value)">
-        <option value="en" selected>English</option>
-        <option value="es">Español</option>
-      </select>
-      <label style="font-size: 0.8rem;">
-        <span id="ui-label-enemies">Enemies:</span>
+<div class="app-layout">
+  <!-- 1. LEFT COLUMN -->
+  <div class="col-left">
+    <div class="card control-group">
+      <div class="panel-title" id="lbl-panel-options">Options & Settings</div>
+      
+      <div class="control-item">
+        <span id="lbl-lang">Language:</span>
+        <select id="lang-select" onchange="setLanguage(this.value)">
+          <option value="en" selected>English</option>
+          <option value="es">Español</option>
+        </select>
+      </div>
+
+      <div class="control-item">
+        <span id="lbl-enemies">Enemies:</span>
         <select id="target-count-select" onchange="updateCombatScenario()">
           <option value="1" id="opt-enemies-1">1 Target (ST)</option>
           <option value="2" id="opt-enemies-2">2 Targets (Cleave)</option>
           <option value="3" id="opt-enemies-3">3+ Targets (AoE)</option>
         </select>
-      </label>
-      <label style="font-size: 0.8rem;">
-        <span id="ui-label-dummy">HP:</span>
+      </div>
+
+      <div class="control-item">
+        <span id="lbl-dummy">Boss HP:</span>
         <select id="dummy-hp" onchange="updateCombatScenario()">
           <option value="100" id="opt-hp-100">100% HP</option>
           <option value="20" id="opt-hp-20">20% HP (Execute)</option>
         </select>
-      </label>
-      <label style="font-size: 0.8rem; display: flex; align-items: center; gap: 3px;">
-        <span id="ui-label-ping">Ping:</span>
-        <input type="number" id="ping-input" min="0" max="1000" value="40" oninput="updatePing(this.value)"> ms
-      </label>
-      <label style="font-size: 0.8rem; display: flex; align-items: center; gap: 3px;">
-        <span id="ui-label-sqw">SQW:</span>
-        <input type="number" id="sqw-input" min="0" max="600" value="400" oninput="updateSQW(this.value)"> ms
-      </label>
-      <button id="btn-pause-toggle" class="btn-pause" onclick="togglePauseCombat()">Pause</button>
-      <button id="btn-edit-mode" onclick="toggleEditMode()">Edit Action Bar</button>
-      <button id="btn-reset" onclick="resetCombat()" style="background: #334155;">Reset</button>
-    </div>
-  </div>
-
-  <!-- Score & Timing HUD -->
-  <div class="card" style="padding: 6px 12px;">
-    <div class="score-hud">
-      <div class="score-box">
-        <span class="score-box-label" id="ui-hud-score">Total Score</span>
-        <span class="score-box-val" id="score-val" style="color: #facc15;">0</span>
-      </div>
-      <div class="score-box">
-        <span class="score-box-label" id="ui-hud-combo">Streak / Combo</span>
-        <span class="score-box-val" id="combo-val" style="color: #38bdf8;">x0 (1.0x)</span>
-      </div>
-      <div class="score-box">
-        <span class="score-box-label" id="ui-hud-timing">Last Timing</span>
-        <span class="score-box-val" id="timing-val" style="color: #94a3b8;">- ms</span>
-      </div>
-      <div class="score-box">
-        <span class="score-box-label" id="ui-hud-grade">Reaction Quality</span>
-        <span class="score-box-val" id="grade-val" style="color: #94a3b8;">READY</span>
-      </div>
-    </div>
-  </div>
-
-  <!-- Talent Presets & Interactive Chips -->
-  <div class="card" style="padding: 10px;">
-    <div class="talents-panel">
-      <div class="talent-header-row">
-        <div style="display: flex; align-items: center; gap: 8px;">
-          <label style="color: #94a3b8; font-weight: bold;" id="ui-label-talents">Slayer Build Preset:</label>
-          <select id="preset-select" class="preset-select" onchange="loadPresetBuild(this.value)">
-            <option value="st_1t">Single Target</option>
-            <option value="cleave_2t">2 Target Cleave</option>
-            <option value="aoe_3t">AoE 3 Targets+</option>
-          </select>
-        </div>
-        <span style="font-size: 0.72rem; color: #64748b;" id="ui-chip-hint">Click chips to toggle talent hooks manually:</span>
-      </div>
-      <div>
-        <div class="talent-chips-grid" id="talent-chips-container"></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Combat Status & Resources -->
-  <div class="card" style="display: flex; flex-direction: column; gap: 8px;">
-    <div class="target-bar">
-      <div><strong id="ui-label-target">Target:</strong> <span id="target-scenario-text">1 Target (100% HP)</span></div>
-      <div style="display: flex; gap: 8px; align-items: center;">
-        <span class="stats-badge status-badge-idle" id="combat-status-badge">Idle</span>
-        <div class="stats-badge"><span id="ui-label-time">Time:</span> <span id="combat-clock">00:00</span></div>
-        <div class="stats-badge">APL Match: <span id="accuracy-rate">100%</span></div>
-        <div class="stats-badge"><span id="ui-label-casts">Casts:</span> <span id="total-casts">0</span></div>
-      </div>
-    </div>
-
-    <div class="auras" id="auras-list"></div>
-
-    <div class="resource-container">
-      <div class="bar-bg">
-        <div class="bar-fill rage-fill" id="rage-bar"></div>
-        <div class="bar-text" id="rage-text">Rage: 40 / 100</div>
       </div>
 
-      <div class="channel-bar-wrapper" id="channel-wrapper">
-        <div class="channel-bar-bg">
-          <div class="channel-fill" id="channel-bar"></div>
-          <div class="channel-text" id="channel-text">Channeling Bladestorm...</div>
+      <div class="control-item">
+        <span id="lbl-range-check">Melee Range (WASD):</span>
+        <select id="range-enforce-select" onchange="toggleRangeEnforcement(this.value)">
+          <option value="on" selected id="opt-range-on">Active (Use WASD)</option>
+          <option value="off" id="opt-range-off">Disabled (Always In Range)</option>
+        </select>
+      </div>
+
+      <div class="control-item">
+        <div class="control-item-row">
+          <span id="lbl-grace">Reaction Grace:</span>
+          <span><input type="number" id="grace-input" min="0" max="1000" step="50" value="400" oninput="updateGraceWindow(this.value)"> ms</span>
         </div>
       </div>
-      
-      <div class="dual-timers">
-        <div class="sub-bar-wrapper">
-          <div class="sub-bar-label">
-            <span id="ui-label-gcd">GCD Tracker</span>
-            <span id="gcd-val-text">1.14s</span>
-          </div>
-          <div class="sub-bar-bg">
-            <div class="gcd-fill" id="gcd-bar"></div>
-          </div>
-        </div>
-        <div class="sub-bar-wrapper">
-          <div class="sub-bar-label">
-            <span id="ui-label-swing">Auto-Attack Swing Timer</span>
-            <span id="swing-val-text">2.18s</span>
-          </div>
-          <div class="sub-bar-bg">
-            <div class="swing-fill" id="swing-bar"></div>
-          </div>
+
+      <div class="control-item">
+        <div class="control-item-row">
+          <span id="lbl-ping">Latency (Ping):</span>
+          <span><input type="number" id="ping-input" min="0" max="1000" value="40" oninput="updatePing(this.value)"> ms</span>
         </div>
       </div>
-    </div>
-  </div>
 
-  <div class="hud-feedback" id="hud-feedback" style="color: #94a3b8;">Press your first keybind to begin combat...</div>
+      <div class="control-item">
+        <div class="control-item-row">
+          <span id="lbl-sqw">SQW Window:</span>
+          <span><input type="number" id="sqw-input" min="0" max="600" value="400" oninput="updateSQW(this.value)"> ms</span>
+        </div>
+      </div>
 
-  <!-- Action Bar -->
-  <div class="card action-bar-wrapper">
-    <div style="display: flex; justify-content: space-between; align-items: center;">
-      <span style="font-size: 0.8rem; font-weight: bold; color: #94a3b8;" id="ui-label-actionbar">Action Bar</span>
-      <button id="btn-add-slot" onclick="addNewSlot()" style="display: none; padding: 2px 6px; font-size: 0.72rem; background: #047857; border-color: #10b981;">+ Add Slot</button>
-    </div>
-    <div class="action-bar" id="action-bar"></div>
-  </div>
-
-  <!-- Diagnostic Metrics -->
-  <div class="card" style="display: flex; flex-direction: column; gap: 8px;">
-    <div style="font-weight: bold; font-size: 0.8rem; color: #94a3b8;" id="ui-label-metrics">Factual Execution Metrics</div>
-    <div class="analyzer-panel">
-      <div class="analyzer-card">
-        <span class="analyzer-title" id="ui-m-apm">Actions / Minute (APM)</span>
-        <span class="analyzer-val" id="analyzer-apm">0.0</span>
-        <span class="analyzer-sub" id="ui-sub-apm">SimC Benchmark: ~53.8 APM</span>
-      </div>
-      <div class="analyzer-card">
-        <span class="analyzer-title" id="ui-m-procs">Wasted Procs</span>
-        <span class="analyzer-val" id="analyzer-wasted-procs" style="color: #f87171;">0</span>
-        <span class="analyzer-sub" id="ui-sub-procs">Overwritten or missed</span>
-      </div>
-      <div class="analyzer-card">
-        <span class="analyzer-title" id="ui-m-ms">Mortal Strike Held</span>
-        <span class="analyzer-val" id="analyzer-ms-held">0.0s</span>
-        <span class="analyzer-sub" id="ui-sub-ms">Available without casting</span>
-      </div>
-      <div class="analyzer-card">
-        <span class="analyzer-title" id="ui-m-rend">Rend Downtime</span>
-        <span class="analyzer-val" id="analyzer-rend-down">0.0s</span>
-        <span class="analyzer-sub" id="ui-sub-rend">Target bleed inactive</span>
-      </div>
-    </div>
-
-    <!-- Most Common Problems -->
-    <div style="font-weight: bold; font-size: 0.8rem; color: #94a3b8; margin-top: 4px;" id="ui-label-problems">Most Common Problems (Detected Patterns)</div>
-    <div class="problems-container" id="problems-container">
-      <div style="color: #64748b; font-style: italic; font-size: 0.8rem; text-align: center; padding: 12px;" id="ui-empty-problems">
-        Start rotating to detect recurring mistakes and improvement areas...
+      <div class="btn-stack">
+        <button id="btn-rebind-open" onclick="openRebindModalForSpell('CS')">⌨ Configure Keybinds</button>
+        <button id="btn-toggle-cdm" class="btn-cdm" onclick="toggleCDMEditMode()">⚙ CDM Edit Mode: OFF</button>
+        <button id="btn-export-cdm" onclick="openExportModal()">Export / Import CDM</button>
+        <button id="btn-pause-toggle" class="btn-pause" onclick="togglePauseCombat()">Pause</button>
+        <button id="btn-reset" onclick="resetCombat()" style="background: #1e293b;">Reset Simulation</button>
       </div>
     </div>
   </div>
 
-  <!-- Timeline Log -->
-  <div class="card">
-    <div class="log-header-row">
-      <span id="ui-label-timeline">Cast Timeline (Click any ability to inspect coach audit)</span>
-      <div id="filter-wrapper" style="display: none;">
-        <span class="filter-indicator">
-          <span id="filter-label">Active Filter</span>
-          <button id="btn-clear-filter" onclick="clearTimelineFilter()" style="padding: 1px 5px; font-size: 0.65rem; background: #00000080; border: none; color: #fff; border-radius: 2px;">✕ Clear Filter</button>
-        </span>
+  <!-- 2. CENTER COLUMN -->
+  <div class="col-center">
+    <div class="card score-hud-wrapper">
+      <div class="score-hud">
+        <div class="score-box">
+          <span class="score-box-label" id="ui-hud-score">Total Score</span>
+          <span class="score-box-val" id="score-val" style="color: #facc15;">0</span>
+        </div>
+        <div class="score-box">
+          <span class="score-box-label" id="ui-hud-combo">Streak / Combo</span>
+          <span class="score-box-val" id="combo-val" style="color: #38bdf8;">x0 (1.0x)</span>
+        </div>
+        <div class="score-box">
+          <span class="score-box-label" id="ui-hud-timing">Last Timing</span>
+          <span class="score-box-val" id="timing-val" style="color: #94a3b8;">- ms</span>
+        </div>
+        <div class="score-box">
+          <span class="score-box-label" id="ui-hud-grade">Reaction Quality</span>
+          <span class="score-box-val" id="grade-val" style="color: #94a3b8;">READY</span>
+        </div>
+      </div>
+
+      <div class="results-ticker">
+        <span class="results-label" id="ui-recent-label">Recent Casts:</span>
+        <div id="results-ticker-list" style="display: flex; gap: 5px; align-items: center;"></div>
       </div>
     </div>
-    <div class="log-container" id="log-container"></div>
+
+    <!-- MAIN GAME WINDOW -->
+    <div class="card game-window-card" id="game-window">
+      <div id="threejs-canvas-layer"></div>
+
+      <div class="game-ui-overlay">
+        <div class="in-game-header">
+          <div class="in-game-badge">
+            <span id="target-scenario-text">1 Target (100% HP)</span> | 
+            <span id="combat-status-badge">Idle</span> | 
+            <span id="combat-clock">00:00</span>
+          </div>
+          <div style="display: flex; gap: 6px; align-items: center;">
+            <span class="in-game-badge" id="arena-dist-text">3.2 yds</span>
+            <span class="range-pill range-in" id="range-badge">IN MELEE RANGE</span>
+          </div>
+        </div>
+
+        <div class="hud-feedback" id="hud-feedback">
+          Hold Right-Click to orbit camera. WASD moves relative to camera view...
+        </div>
+
+        <!-- CDM OVERLAYS -->
+        <!-- FRAME 1: Resource & Bladestorm Channel -->
+        <div class="cdm-frame" id="frame-resource" data-id="resource" style="top: 320px; left: 230px;">
+          <div class="cdm-drag-handle">
+            <span id="lbl-frame-res">⠿ Resource & Rage</span>
+            <span style="font-size:0.55rem; opacity:0.8;" id="lbl-handle-move1">Move</span>
+          </div>
+          <div class="resource-container">
+            <div class="resource-bar-wrapper orientation-horizontal" id="resource-bar-dom">
+              <div class="resource-fill" id="rage-bar"></div>
+              <div class="resource-text" id="rage-text">Rage: 40 / 100</div>
+            </div>
+            <div class="channel-bar-wrapper" id="channel-wrapper">
+              <div class="channel-bar-bg">
+                <div class="channel-fill" id="channel-bar"></div>
+                <div class="channel-text" id="channel-text">Channeling Bladestorm...</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- FRAME 2: Essential Cooldowns -->
+        <div class="cdm-frame" id="frame-cdm-primary" data-id="cdmPrimary" style="top: 380px; left: 180px;">
+          <div class="cdm-drag-handle">
+            <span id="lbl-frame-primary">⠿ Essential Cooldowns</span>
+            <span style="font-size:0.55rem; opacity:0.8;" id="lbl-handle-move2">Move</span>
+          </div>
+          <div class="cdm-slot-container orientation-horizontal" id="container-cdmPrimary" data-panel="cdmPrimary"></div>
+        </div>
+
+        <!-- FRAME 3: Utility Cooldowns -->
+        <div class="cdm-frame" id="frame-cdm-secondary" data-id="cdmSecondary" style="top: 450px; left: 250px;">
+          <div class="cdm-drag-handle">
+            <span id="lbl-frame-secondary">⠿ Utility Cooldowns</span>
+            <span style="font-size:0.55rem; opacity:0.8;" id="lbl-handle-move3">Move</span>
+          </div>
+          <div class="cdm-slot-container orientation-horizontal" id="container-cdmSecondary" data-panel="cdmSecondary"></div>
+        </div>
+
+        <!-- FRAME 4: Player Buffs -->
+        <div class="cdm-frame" id="frame-player-auras" data-id="playerAuras" style="top: 320px; left: 500px;">
+          <div class="cdm-drag-handle">
+            <span id="lbl-frame-player-auras">⠿ Procs & Buffs</span>
+            <span style="font-size:0.55rem; opacity:0.8;" id="lbl-handle-move4">Move</span>
+          </div>
+          <div class="auras-flex orientation-horizontal" id="container-playerAuras"></div>
+        </div>
+
+        <!-- FRAME 5: Target Debuffs -->
+        <div class="cdm-frame" id="frame-target-auras" data-id="targetAuras" style="top: 320px; left: 50px;">
+          <div class="cdm-drag-handle">
+            <span id="lbl-frame-target-auras">⠿ Target Debuffs</span>
+            <span style="font-size:0.55rem; opacity:0.8;" id="lbl-handle-move5">Move</span>
+          </div>
+          <div class="auras-flex orientation-horizontal" id="container-targetAuras"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. RIGHT COLUMN -->
+  <div class="col-right">
+    <div class="card" style="display: flex; flex-direction: column; gap: 8px;">
+      <div class="panel-title" id="lbl-panel-metrics">Execution Metrics</div>
+      <div class="metrics-grid">
+        <div class="metric-box">
+          <span style="font-size:0.65rem; color:#94a3b8; font-weight:bold;">APM</span>
+          <span class="metric-val" id="analyzer-apm">0.0</span>
+          <span class="metric-sub" id="lbl-sub-apm">Benchmark: ~53.8</span>
+        </div>
+        <div class="metric-box">
+          <span style="font-size:0.65rem; color:#94a3b8; font-weight:bold;" id="lbl-wasted-procs">Wasted Procs</span>
+          <span class="metric-val" id="analyzer-wasted-procs" style="color: #f87171;">0</span>
+          <span class="metric-sub" id="lbl-sub-wasted">Overwritten</span>
+        </div>
+        <div class="metric-box">
+          <span style="font-size:0.65rem; color:#94a3b8; font-weight:bold;" id="lbl-ms-held">MS Held</span>
+          <span class="metric-val" id="analyzer-ms-held">0.0s</span>
+          <span class="metric-sub" id="lbl-sub-ms">Off Cooldown</span>
+        </div>
+        <div class="metric-box">
+          <span style="font-size:0.65rem; color:#94a3b8; font-weight:bold;" id="lbl-rend-down">Rend Downtime</span>
+          <span class="metric-val" id="analyzer-rend-down">0.0s</span>
+          <span class="metric-sub" id="lbl-sub-rend">Bleed inactive</span>
+        </div>
+      </div>
+
+      <div class="panel-title" style="margin-top: 4px;" id="lbl-panel-talents">Arms Slayer Talents (Toggle)</div>
+      <div class="talents-grid-scroll" id="talents-grid"></div>
+    </div>
+
+    <!-- Timeline Log -->
+    <div class="card" style="display: flex; flex-direction: column; gap: 6px;">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <span class="panel-title" style="margin: 0; border: none;" id="lbl-panel-timeline">Cast Timeline</span>
+        <button id="btn-clear-filter" onclick="clearTimelineFilter()" style="display: none; padding: 1px 5px; font-size: 0.65rem; background: #991b1b; border: none; color: #fff; border-radius: 2px;">✕ Clear Filter</button>
+      </div>
+      <div class="log-container" id="log-container"></div>
+    </div>
   </div>
 </div>
 
-<!-- Modal Audit -->
+<!-- Keybind Configuration Modal -->
+<div class="modal-backdrop" id="rebind-modal">
+  <div class="modal-box">
+    <h3 style="font-size: 0.95rem; color: #fff; display: flex; align-items: center; gap: 6px;">
+      <span style="color:#38bdf8;">⌨</span> <span id="lbl-modal-rebind-title">Configure Ability Keybind</span>
+    </h3>
+    <div style="font-size: 0.74rem; color: #94a3b8;" id="lbl-modal-rebind-desc">
+      Select an ability and press any key, modifier combo (<strong>Shift / Ctrl / Alt</strong>) or mouse button (<strong>M3, M4, M5</strong>).
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 4px; margin-top: 4px;">
+      <label style="font-size: 0.72rem; font-weight: bold; color: #cbd5e1;" id="lbl-modal-rebind-spell">Ability:</label>
+      <select id="rebind-spell-select" onchange="onRebindSpellSelectChange(this.value)" style="width: 100%; padding: 6px; font-weight: bold;"></select>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 4px; margin-top: 4px;">
+      <label style="font-size: 0.72rem; font-weight: bold; color: #cbd5e1;" id="lbl-modal-rebind-key">Assigned Key / Mousebind:</label>
+      <input type="text" id="rebind-key-input" readonly placeholder="Press any key or mouse button..." 
+             style="width: 100%; padding: 8px; text-align: center; font-size: 0.95rem; font-weight: 800; color: #38bdf8; border: 2px solid #0284c7; background: #060911; cursor: pointer;">
+    </div>
+
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
+      <button onclick="restoreDefaultKeybindForSelected()" style="background: #334155; font-size: 0.7rem; padding: 4px 8px;" id="btn-rebind-default">Default</button>
+      <div style="display: flex; gap: 6px;">
+        <button onclick="closeRebindModal()" id="btn-rebind-cancel">Cancel</button>
+        <button onclick="saveRebindModal()" style="background: #0284c7; border-color: #38bdf8;" id="btn-rebind-save">Save Keybind</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CDM Inspector -->
+<div id="cdm-inspector">
+  <div class="inspector-header">
+    <span class="inspector-title" id="insp-frame-name">Frame Settings</span>
+    <span style="font-size: 0.7rem; color: #94a3b8; cursor: pointer;" onclick="deselectFrame()">✕</span>
+  </div>
+  
+  <div class="inspector-row">
+    <span id="lbl-insp-orient">Orientation:</span>
+    <select id="insp-orientation" onchange="onOrientationChange(this.value)" style="background: #060911; color:#fff; border: 1px solid #334155; padding: 2px 6px; border-radius: 4px; font-size: 0.72rem;">
+      <option value="horizontal">Horizontal</option>
+      <option value="vertical">Vertical</option>
+    </select>
+  </div>
+
+  <div class="inspector-row">
+    <span id="lbl-insp-scale">Scale:</span>
+    <input type="range" id="insp-scale" min="0.6" max="1.4" step="0.05" value="1.0" oninput="onScaleChange(this.value)">
+    <span id="insp-scale-txt" style="font-weight: bold; width: 35px; text-align: right;">100%</span>
+  </div>
+
+  <div class="inspector-row">
+    <span id="lbl-insp-vis">Visible:</span>
+    <input type="checkbox" id="insp-visible" checked onchange="onVisibilityChange(this.checked)">
+  </div>
+
+  <div style="display: flex; gap: 4px; margin-top: 4px;">
+    <button class="cdm-btn" style="flex:1; padding: 4px;" onclick="centerSelectedFrame()" id="btn-insp-center">Center</button>
+    <button class="cdm-btn" style="flex:1; padding: 4px;" onclick="resetSelectedFrame()" id="btn-insp-reset">Reset</button>
+  </div>
+</div>
+
+<!-- Audit Modal -->
 <div class="modal-backdrop" id="audit-modal">
   <div class="modal-box">
-    <h3 style="font-size: 0.95rem; color: #f8fafc;" id="audit-title">Spell Execution Audit</h3>
-    <div class="audit-row"><span id="lbl-audit-spell">Executed Spell:</span><strong id="audit-spell">-</strong></div>
-    <div class="audit-row"><span id="lbl-audit-ideal">Expected Spell (APL):</span><strong id="audit-ideal" style="color: #facc15;">-</strong></div>
-    <div class="audit-row"><span id="lbl-audit-timing">Timing Accuracy:</span><span id="audit-timing">-</span></div>
-    <div class="audit-row"><span id="lbl-audit-pattern">Error Pattern:</span><strong id="audit-pattern" style="color: #f87171;">-</strong></div>
-    <div class="audit-row"><span id="lbl-audit-state">Player Snapshot:</span><span id="audit-state">-</span></div>
+    <h3 style="font-size: 0.9rem;" id="lbl-audit-title">Spell Execution Audit</h3>
+    <div class="audit-row"><span id="lbl-audit-exec">Executed Spell:</span><strong id="audit-spell">-</strong></div>
+    <div class="audit-row"><span id="lbl-audit-exp">Expected Spell (APL):</span><strong id="audit-ideal" style="color: #facc15;">-</strong></div>
+    <div class="audit-row"><span id="lbl-audit-tim">Timing Accuracy:</span><span id="audit-timing">-</span></div>
+    <div class="audit-row"><span id="lbl-audit-pat">Error Pattern:</span><strong id="audit-pattern" style="color: #f87171;">-</strong></div>
+    <div class="audit-row"><span id="lbl-audit-snap">Player Snapshot:</span><span id="audit-state">-</span></div>
     <div>
-      <span style="font-size: 0.75rem; font-weight: bold; color: #94a3b8;" id="lbl-audit-reason">Coach Diagnostic:</span>
+      <span style="font-size: 0.72rem; font-weight: bold; color: #94a3b8;" id="lbl-audit-diag">Coach Diagnostic:</span>
       <div class="audit-reason-box" id="audit-reason"></div>
     </div>
     <div style="display: flex; justify-content: flex-end;">
-      <button onclick="closeAuditModal()" style="background: #2563eb; border-color: #3b82f6;" id="btn-audit-close">Got It</button>
+      <button onclick="closeAuditModal()" style="background: #2563eb; border-color: #3b82f6;" id="btn-audit-close">Close</button>
     </div>
   </div>
 </div>
 
-<!-- Modal Edit Keybind -->
-<div class="modal-backdrop" id="slot-modal">
+<!-- Export/Import Modal -->
+<div class="modal-backdrop" id="export-modal">
   <div class="modal-box">
-    <h3 style="font-size: 0.95rem;" id="lbl-modal-edit">Configure Button</h3>
-    <div>
-      <label style="font-size: 0.75rem;" id="lbl-modal-spell">Ability:</label>
-      <select id="modal-spell-select" style="width: 100%; margin-top: 3px;"></select>
-    </div>
-    <div>
-      <label style="font-size: 0.75rem;">Keybind:</label>
-      <input type="text" id="modal-key-input" maxlength="2" style="width: 100%; margin-top: 3px; text-transform: uppercase; text-align: center; font-weight: bold;">
-    </div>
-    <div style="display: flex; justify-content: flex-end; gap: 6px; margin-top: 6px;">
-      <button onclick="closeModal()" id="btn-modal-cancel">Cancel</button>
-      <button onclick="saveModalConfig()" style="background: #2563eb; border-color: #3b82f6;" id="btn-modal-save">Save</button>
+    <h3 style="font-size: 0.9rem;" id="lbl-exp-title">Import / Export CDM Layout</h3>
+    <p style="font-size: 0.72rem; color: #94a3b8;" id="lbl-exp-desc">Copy this string to backup your setup, or paste a string to import it:</p>
+    <textarea id="layout-string-io" style="width: 100%; height: 100px; background: #060911; border: 1px solid #334155; border-radius: 4px; color: #38bdf8; font-family: monospace; font-size: 0.72rem; padding: 6px; resize: none;"></textarea>
+    <div style="display: flex; justify-content: flex-end; gap: 6px;">
+      <button onclick="closeExportModal()" id="btn-exp-cancel">Cancel</button>
+      <button onclick="importLayoutFromIO()" style="background: #0284c7; border-color: #38bdf8;" id="btn-exp-load">Load Layout</button>
     </div>
   </div>
 </div>
 
 <script>
 // ==========================================
-// 1. INTERNACIONALIZACIÓN (i18n DICCIONARIOS)
+// 0. DEFINICIONES DE ESTADO Y BASES DE DATOS (RESTABLECIDAS)
 // ==========================================
+let currentLang = "en";
+
 const I18N = {
-  es: {
-    uiTitle: "Simulador de Rotación: Warrior Arms Slayer",
-    uiSubtitle: "APL SimC v12.1.0 + ST / 2 Objetivos Cleave / 3+ Objetivos AoE + Fervor of Battle",
-    labelEnemies: "Enemigos:",
-    optEnemies1: "1 Objetivo (ST)",
-    optEnemies2: "2 Objetivos (Cleave)",
-    optEnemies3: "3+ Objetivos (AoE)",
-    labelDummy: "Salud:",
-    optHp100: "100% HP",
-    optHp20: "20% HP (Execute)",
-    labelPing: "Ping:",
-    labelSqw: "SQW:",
-    btnPause: "Pausar",
-    btnResume: "Reanudar",
-    btnEditBar: "Configurar Barra",
-    btnFinishEdit: "Finalizar Edición",
-    btnReset: "Reiniciar",
-    hudScore: "Puntuación Total",
-    hudCombo: "Racha / Combo",
-    hudTiming: "Último Timing",
-    hudGrade: "Calidad de Reacción",
-    gradeReady: "LISTO",
-    gradeBroken: "C ROTO",
-    gradeRhythm: "B EN RITMO",
-    gradeGreat: "A EXCELENTE",
-    gradeGodlike: "S+ GODLIKE",
-    labelTalents: "Preset de Talentos Slayer:",
-    chipHint: "Haz clic en los chips para alternar talentos:",
-    optPresetST: "Single Target",
-    optPresetCleave: "2 Target Cleave",
-    optPresetAoE: "AoE 3 Targets+",
-    labelTarget: "Objetivo:",
-    statusIdle: "En Reposo",
-    statusCombat: "En Combate",
-    statusPaused: "En Pausa",
-    labelTime: "Tiempo:",
-    labelCasts: "Casts:",
-    rageLabel: "Furia",
-    channelingBS: "Canalizando Bladestorm...",
-    channelCancelHint: "para CancelAura",
-    labelGCD: "GCD Tracker",
-    labelSwing: "Auto-Attack Swing Timer",
-    hudPromptStart: "Presiona tu primer botón para comenzar el combate...",
-    hudPaused: "Simulación en Pausa",
-    hudResumed: "Simulación reanudada",
-    labelActionBar: "Barra de Acción",
-    btnAddSlot: "+ Añadir Botón",
-    labelMetrics: "Métricas Fácticas de Ejecución",
-    mAPM: "Acciones / Minuto (APM)",
-    subAPM: "Objetivo SimC: ~53.8 APM",
-    mWastedProcs: "Procs Desperdiciados",
-    subWastedProcs: "Sobreescritos o ignorados",
-    mMSHeld: "Mortal Strike Retenido",
-    subMSHeld: "Disponible sin usar",
-    mRendDown: "Tiempo de Rend Caído",
-    subRendDown: "DoT inactivo en objetivo",
-    labelProblems: "Problemas Más Comunes (Patrones Detectados)",
-    emptyProblems: "Comienza a rotar para detectar tus patrones de error y áreas de mejora...",
-    flawlessProblems: "✓ ¡Rotación Impecable! No se han detectado patrones de error recurrentes.",
-    labelTimeline: "Timeline de Habilidades (Haz clic en cualquier cast para ver auditoría)",
-    filterActive: "Filtro Activo",
-    btnClearFilter: "✕ Quitar Filtro",
-    auditTitle: "Auditoría de Habilidad",
-    lblAuditSpell: "Habilidad Ejecutada:",
-    lblAuditIdeal: "Habilidad Esperada (APL):",
-    lblAuditTiming: "Calidad de Timing:",
-    lblAuditPattern: "Patrón de Error:",
-    lblAuditState: "Estado del Personaje:",
-    lblAuditReason: "Diagnóstico del Entrenador:",
-    btnAuditClose: "Entendido",
-    lblModalEdit: "Configurar Botón",
-    lblModalSpell: "Habilidad:",
-    btnModalCancel: "Cancelar",
-    btnModalSave: "Guardar",
-    ofMistakes: "de tus errores",
-    showMe: "Show Me!",
-    optimalSequence: "Secuencia Óptima",
-    optimalDiagnosis: "Decisión óptima según la APL de SimulationCraft.",
-    auraQueue: "Encolado",
-    auraChannel: "¡Canalizando!",
-    auraProcSD: "¡Proc Sudden Death!",
-    auraProcHS: "¡Proc Heroic Strike!"
-  },
   en: {
-    uiTitle: "Rotation Trainer: Warrior Arms Slayer",
-    uiSubtitle: "SimC APL v12.1.0 + ST / 2-Target Cleave / 3+ Target AoE + Fervor of Battle",
-    labelEnemies: "Enemies:",
+    rageLabel: "Rage",
+    channelingBS: "Channeling Bladestorm...",
+    cancelHint: "to cancel",
+    btnPause: "Pause",
+    btnResume: "Resume",
+    btnCdmEditOn: "⚙ CDM Edit Mode: ON",
+    btnCdmEditOff: "⚙ CDM Edit Mode: OFF",
+    rangeIn: "IN MELEE RANGE",
+    rangeOut: "OUT OF RANGE",
+    outOfRangeMsg: "Target is out of melee range! Move closer with WASD.",
+    failedCD: "is currently on cooldown!",
+    failedRage: "Not enough Rage!",
+    failedExec: "Target is above 20% HP and no Sudden Death proc!",
+    suboptimalMsg: "Suboptimal: Priority was",
+    optimalSeq: "Optimal sequence execution",
+    optimalDiag: "Executed according to Slayer APL priority",
+    hudFeedbackStart: "Hold Right-Click to orbit camera. WASD moves relative to camera view...",
+    hudFeedbackPaused: "Simulation paused",
+    hudFeedbackResumed: "Simulation resumed",
     optEnemies1: "1 Target (ST)",
     optEnemies2: "2 Targets (Cleave)",
     optEnemies3: "3+ Targets (AoE)",
-    labelDummy: "HP:",
     optHp100: "100% HP",
     optHp20: "20% HP (Execute)",
-    labelPing: "Ping:",
-    labelSqw: "SQW:",
-    btnPause: "Pause",
-    btnResume: "Resume",
-    btnEditBar: "Edit Action Bar",
-    btnFinishEdit: "Finish Editing",
-    btnReset: "Reset",
-    hudScore: "Total Score",
-    hudCombo: "Streak / Combo",
-    hudTiming: "Last Timing",
-    hudGrade: "Reaction Quality",
-    gradeReady: "READY",
-    gradeBroken: "C BROKEN",
-    gradeRhythm: "B IN FLOW",
-    gradeGreat: "A GREAT",
-    gradeGodlike: "S+ GODLIKE",
-    labelTalents: "Slayer Build Preset:",
-    chipHint: "Click chips to toggle talent hooks manually:",
-    optPresetST: "Single Target",
-    optPresetCleave: "2 Target Cleave",
-    optPresetAoE: "AoE 3 Targets+",
-    labelTarget: "Target:",
-    statusIdle: "Idle",
-    statusCombat: "In Combat",
-    statusPaused: "Paused",
-    labelTime: "Time:",
-    labelCasts: "Casts:",
-    rageLabel: "Rage",
-    channelingBS: "Channeling Bladestorm...",
-    channelCancelHint: "to CancelAura",
-    labelGCD: "GCD Tracker",
-    labelSwing: "Auto-Attack Swing Timer",
-    hudPromptStart: "Press your first keybind to begin combat...",
-    hudPaused: "Simulation Paused",
-    hudResumed: "Simulation Resumed",
-    labelActionBar: "Action Bar",
-    btnAddSlot: "+ Add Slot",
-    labelMetrics: "Factual Execution Metrics",
-    mAPM: "Actions / Minute (APM)",
-    subAPM: "SimC Benchmark: ~53.8 APM",
-    mWastedProcs: "Wasted Procs",
-    subWastedProcs: "Overwritten or missed",
-    mMSHeld: "Mortal Strike Held",
-    subMSHeld: "Available without casting",
-    mRendDown: "Rend Downtime",
-    subRendDown: "Target bleed inactive",
-    labelProblems: "Most Common Problems (Detected Patterns)",
-    emptyProblems: "Start rotating to detect recurring mistakes and improvement areas...",
-    flawlessProblems: "✓ Flawless Execution! No recurring error patterns detected.",
-    labelTimeline: "Cast Timeline (Click any ability to inspect coach audit)",
-    filterActive: "Active Filter",
-    btnClearFilter: "✕ Clear Filter",
-    auditTitle: "Spell Execution Audit",
-    lblAuditSpell: "Executed Spell:",
-    lblAuditIdeal: "Expected Spell (APL):",
-    lblAuditTiming: "Timing Accuracy:",
-    lblAuditPattern: "Error Pattern:",
-    lblAuditState: "Player Snapshot:",
-    lblAuditReason: "Coach Diagnostic:",
-    btnAuditClose: "Got It",
-    lblModalEdit: "Configure Button",
-    lblModalSpell: "Ability:",
-    btnModalCancel: "Cancel",
-    btnModalSave: "Save",
-    ofMistakes: "of mistakes",
-    showMe: "Show Me!",
-    optimalSequence: "Optimal Sequence",
-    optimalDiagnosis: "Optimal cast choice following SimulationCraft APL priorities.",
-    auraQueue: "Queued",
-    auraChannel: "Channeling!",
-    auraProcSD: "Sudden Death Proc!",
-    auraProcHS: "Heroic Strike Proc!"
+    gradeGodlike: "GODLIKE",
+    gradeGreat: "EXCELLENT",
+    gradeFlow: "IN FLOW",
+    gradeBroken: "RESET"
+  },
+  es: {
+    rageLabel: "Ira",
+    channelingBS: "Canalizando Filotormenta...",
+    cancelHint: "para cancelar",
+    btnPause: "Pausar",
+    btnResume: "Reanudar",
+    btnCdmEditOn: "⚙ Modo Edición CDM: ACTIVO",
+    btnCdmEditOff: "⚙ Modo Edición CDM: INACTIVO",
+    rangeIn: "EN RANGO MELÉ",
+    rangeOut: "FUERA DE RANGO",
+    outOfRangeMsg: "¡El objetivo está fuera de rango melé! Acércate con WASD.",
+    failedCD: "¡está en tiempo de reutilización!",
+    failedRage: "¡No tienes suficiente Ira!",
+    failedExec: "¡El objetivo está por encima del 20% de salud sin Sudden Death!",
+    suboptimalMsg: "Subóptimo: La prioridad era",
+    optimalSeq: "Secuencia óptima ejecutada",
+    optimalDiag: "Ejecutado de acuerdo a la prioridad APL de Slayer",
+    hudFeedbackStart: "Mantén Clic Derecho para rotar cámara. WASD se mueve relativo a la vista...",
+    hudFeedbackPaused: "Simulación pausada",
+    hudFeedbackResumed: "Simulación reanudada",
+    optEnemies1: "1 Objetivo (ST)",
+    optEnemies2: "2 Objetivos (Cleave)",
+    optEnemies3: "3+ Objetivos (AoE)",
+    optHp100: "100% Salud",
+    optHp20: "20% Salud (Execute)",
+    gradeGodlike: "DIVINO",
+    gradeGreat: "EXCELENTE",
+    gradeFlow: "EN RITMO",
+    gradeBroken: "REINICIO"
   }
 };
 
-let currentLang = "en"; // Default: English
-
-function t(key) {
-  return (I18N[currentLang] && I18N[currentLang][key]) || key;
-}
+function t(k) { return (I18N[currentLang] && I18N[currentLang][k]) || k; }
 
 function setLanguage(lang) {
   currentLang = lang;
-  document.getElementById("lang-select").value = lang;
-  updateStaticLanguageUI();
-  renderTalentChips();
-  buildActionBarUI();
-  renderMostCommonProblems();
-  renderTimelineView();
-}
-
-function updateStaticLanguageUI() {
-  document.getElementById("ui-title").innerText = t("uiTitle");
-  document.getElementById("ui-subtitle").innerText = t("uiSubtitle");
-  document.getElementById("ui-label-enemies").innerText = t("labelEnemies");
-  document.getElementById("opt-enemies-1").innerText = t("optEnemies1");
-  document.getElementById("opt-enemies-2").innerText = t("optEnemies2");
-  document.getElementById("opt-enemies-3").innerText = t("optEnemies3");
-  document.getElementById("ui-label-dummy").innerText = t("labelDummy");
-  document.getElementById("opt-hp-100").innerText = t("optHp100");
-  document.getElementById("opt-hp-20").innerText = t("optHp20");
-  document.getElementById("ui-label-ping").innerText = t("labelPing");
-  document.getElementById("ui-label-sqw").innerText = t("labelSqw");
-  document.getElementById("btn-reset").innerText = t("btnReset");
-  document.getElementById("btn-pause-toggle").innerText = state.combatPaused ? t("btnResume") : t("btnPause");
-  document.getElementById("btn-edit-mode").innerText = isEditMode ? t("btnFinishEdit") : t("btnEditBar");
-  
-  document.getElementById("ui-hud-score").innerText = t("hudScore");
-  document.getElementById("ui-hud-combo").innerText = t("hudCombo");
-  document.getElementById("ui-hud-timing").innerText = t("hudTiming");
-  document.getElementById("ui-hud-grade").innerText = t("hudGrade");
-
-  document.getElementById("ui-label-talents").innerText = t("labelTalents");
-  document.getElementById("ui-chip-hint").innerText = t("chipHint");
-  
-  const presetSelect = document.getElementById("preset-select");
-  presetSelect.options[0].text = t("optPresetST");
-  presetSelect.options[1].text = t("optPresetCleave");
-  presetSelect.options[2].text = t("optPresetAoE");
-
-  document.getElementById("ui-label-target").innerText = t("labelTarget");
-  document.getElementById("ui-label-time").innerText = t("labelTime");
-  document.getElementById("ui-label-casts").innerText = t("labelCasts");
-  document.getElementById("ui-label-gcd").innerText = t("labelGCD");
-  document.getElementById("ui-label-swing").innerText = t("labelSwing");
-  document.getElementById("ui-label-actionbar").innerText = t("labelActionBar");
-  document.getElementById("btn-add-slot").innerText = t("btnAddSlot");
-
-  document.getElementById("ui-label-metrics").innerText = t("labelMetrics");
-  document.getElementById("ui-m-apm").innerText = t("mAPM");
-  document.getElementById("ui-sub-apm").innerText = t("subAPM");
-  document.getElementById("ui-m-procs").innerText = t("mWastedProcs");
-  document.getElementById("ui-sub-procs").innerText = t("subWastedProcs");
-  document.getElementById("ui-m-ms").innerText = t("mMSHeld");
-  document.getElementById("ui-sub-ms").innerText = t("subMSHeld");
-  document.getElementById("ui-m-rend").innerText = t("mRendDown");
-  document.getElementById("ui-sub-rend").innerText = t("subRendDown");
-
-  document.getElementById("ui-label-problems").innerText = t("labelProblems");
-  document.getElementById("ui-label-timeline").innerText = t("labelTimeline");
-  document.getElementById("btn-clear-filter").innerText = t("btnClearFilter");
-
-  document.getElementById("audit-title").innerText = t("auditTitle");
-  document.getElementById("lbl-audit-spell").innerText = t("lblAuditSpell");
-  document.getElementById("lbl-audit-ideal").innerText = t("lblAuditIdeal");
-  document.getElementById("lbl-audit-timing").innerText = t("lblAuditTiming");
-  document.getElementById("lbl-audit-pattern").innerText = t("lblAuditPattern");
-  document.getElementById("lbl-audit-state").innerText = t("lblAuditState");
-  document.getElementById("lbl-audit-reason").innerText = t("lblAuditReason");
-  document.getElementById("btn-audit-close").innerText = t("btnAuditClose");
-
-  document.getElementById("lbl-modal-edit").innerText = t("lblModalEdit");
-  document.getElementById("lbl-modal-spell").innerText = t("lblModalSpell");
-  document.getElementById("btn-modal-cancel").innerText = t("btnModalCancel");
-  document.getElementById("btn-modal-save").innerText = t("btnModalSave");
+  const langSel = document.getElementById("lang-select");
+  if (langSel) langSel.value = lang;
   updateTargetScenarioText();
+  renderTalentsGrid();
 }
 
-function updateTargetScenarioText() {
-  const countText = state.targetCount === 1 ? (currentLang === "en" ? "1 Target" : "1 Objetivo") : 
-                    state.targetCount === 2 ? (currentLang === "en" ? "2 Targets (Cleave)" : "2 Objetivos (Cleave)") : 
-                    (currentLang === "en" ? "3+ Targets (AoE)" : "3+ Objetivos (AoE)");
-  const hpText = state.targetHP <= 20 ? (currentLang === "en" ? "20% HP (Execute)" : "20% HP (Execute)") : "100% HP";
-  document.getElementById("target-scenario-text").innerText = `${countText} (${hpText})`;
-}
-
-// ==========================================
-// 2. AUDIO SINTETIZADO (WEB AUDIO API)
-// ==========================================
-let audioCtx = null;
-function initAudio() {
-  if (!audioCtx) {
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  }
-  if (audioCtx.state === 'suspended') {
-    audioCtx.resume();
-  }
-}
-
-function playSynthesizedTone(freq, type, duration, gainVal = 0.08) {
-  if (!audioCtx) return;
-  try {
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    osc.type = type;
-    osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-    gain.gain.setValueAtTime(gainVal, audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
-    osc.connect(gain);
-    gain.connect(audioCtx.destination);
-    osc.start();
-    osc.stop(audioCtx.currentTime + duration);
-  } catch (e) {}
-}
-
-function playAudioFeedback(type) {
-  initAudio();
-  if (type === "perfect") {
-    playSynthesizedTone(880, "sine", 0.08, 0.09);
-    setTimeout(() => playSynthesizedTone(1320, "sine", 0.12, 0.08), 40);
-  } else if (type === "good") {
-    playSynthesizedTone(660, "sine", 0.1, 0.08);
-  } else if (type === "late") {
-    playSynthesizedTone(440, "triangle", 0.12, 0.08);
-  } else if (type === "error" || type === "miss") {
-    playSynthesizedTone(130, "sawtooth", 0.18, 0.12);
-  } else if (type === "proc") {
-    playSynthesizedTone(1046, "sine", 0.08, 0.08);
-    setTimeout(() => playSynthesizedTone(1318, "sine", 0.08, 0.08), 50);
-    setTimeout(() => playSynthesizedTone(1567, "sine", 0.15, 0.08), 100);
-  }
-}
-
-// ==========================================
-// 3. TAXONOMÍA DE PATRONES DE ERROR (ST & AoE)
-// ==========================================
-const ERROR_TAXONOMY = {
-  SKIPPED_SWEEPING_STRIKES: {
-    id: "SKIPPED_SWEEPING_STRIKES",
-    title_es: "Olvidaste activar Sweeping Strikes en presencia de múltiples objetivos (2+ enemies)",
-    tip_es: "Sweeping Strikes otorga cargas para duplicar tus ataques a un segundo objetivo. Es la prioridad #1 al luchar contra 2 o más enemigos[cite: 1].",
-    title_en: "You frequently skipped casting Sweeping Strikes with multiple active targets (2+ enemies)",
-    tip_en: "Sweeping Strikes grants charges to duplicate your single-target abilities to a second target[cite: 1]."
-  },
-  SKIPPED_AOE_CLEAVE: {
-    id: "SKIPPED_AOE_CLEAVE",
-    title_es: "No priorizaste Cleave en pulls de área masiva (3+ enemigos)",
-    tip_es: "En AoE con Fervor of Battle, Cleave aplica Rend, castea Slam y consume Heroic Strike sin necesidad de usar Slam directamente[cite: 1].",
-    title_en: "You failed to prioritize Cleave during massive AoE (3+ targets)",
-    tip_en: "In AoE situations with Fervor of Battle, Cleave triggers Slam, applies Rend, and consumes Heroic Strike procs[cite: 1]."
-  },
-  SKIPPED_HEROIC_STRIKE: {
-    id: "SKIPPED_HEROIC_STRIKE",
-    title_es: "Ignoraste frecuentemente Heroic Strike cuando tenías el proc activo",
-    tip_es: "Heroic Strike tiene la prioridad más alta de daño por GCD en Single Target. No usarlo retrasa tu daño y arriesga perder el beneficio[cite: 1].",
-    title_en: "You frequently skipped casting Heroic Strike when its proc was active",
-    tip_en: "Heroic Strike holds highest damage priority per GCD in Single Target[cite: 1]."
-  },
-  OVERSTACKED_PRECISION: {
-    id: "OVERSTACKED_PRECISION",
-    title_es: "Lanzaste Execute teniendo 2 stacks de Executioner's Precision en lugar de Mortal Strike",
-    tip_es: "Al llegar a 2 acumulaciones de Executioner's Precision, la APL exige descargar Mortal Strike de inmediato para potenciar su golpe y no desperdiciar stacks[cite: 1].",
-    title_en: "You cast Execute with 2 stacks of Executioner's Precision instead of Mortal Strike",
-    tip_en: "Upon reaching 2 stacks of Executioner's Precision, the APL demands casting Mortal Strike to discharge the massive damage amp[cite: 1]."
-  },
-  EARLY_MS_EXECUTE: {
-    id: "EARLY_MS_EXECUTE",
-    title_es: "Lanzaste Mortal Strike en fase Execute sin tener los 2 stacks de Executioner's Precision",
-    tip_es: "En fase de Execute, Mortal Strike solo debe presionarse como detonador con 2 stacks. Lanzarlo antes consume Furia y GCDs que corresponden a Execute[cite: 1].",
-    title_en: "You cast Mortal Strike during Execute phase before reaching 2 Executioner's Precision stacks",
-    tip_en: "During Execute phase, Mortal Strike is strictly an empowered discharge at 2 stacks[cite: 1]."
-  },
-  DELAYED_MORTAL_STRIKE: {
-    id: "DELAYED_MORTAL_STRIKE",
-    title_es: "Retuviste Mortal Strike disponible mientras usabas habilidades secundarias (Slam / Cleave)",
-    tip_es: "En Single Target, Mortal Strike es tu generador principal de daño y sangrados. Debe tirarse inmediatamente al salir de cooldown si hay Furia[cite: 1].",
-    title_en: "You held Mortal Strike off cooldown while using low-priority fillers (Slam / Cleave)",
-    tip_en: "In Single Target, Mortal Strike is your primary core hitter and bleed trigger[cite: 1]."
-  },
-  DROPPED_REND: {
-    id: "DROPPED_REND",
-    title_es: "Dejaste caer el sangrado de Rend por no refrescarlo con Cleave a tiempo",
-    tip_es: "Refresca Rend con Cleave cuando le queden ≤ 4.5s (ventana Pandemic) para acumular hasta 19.5s sin perder tiempo de daño del DoT[cite: 1].",
-    title_en: "You dropped Rend on the target by failing to refresh it with Cleave in time",
-    tip_en: "Refresh Rend with Cleave when remaining duration is ≤ 4.5s (Pandemic window)[cite: 1]."
-  },
-  DELAYED_BURST_CD: {
-    id: "DELAYED_BURST_CD",
-    title_es: "Retuviste Colossus Smash, Avatar o Bladestorm listos sin sincronizarlos",
-    tip_es: "Avatar, Colossus Smash y Bladestorm deben ejecutarse de forma fluida para concentrar todo el daño en la ventana multiplicativa[cite: 1].",
-    title_en: "You delayed casting Colossus Smash, Avatar, or Bladestorm while ready",
-    tip_en: "Avatar, Colossus Smash, and Bladestorm must be sequenced fluidly inside your major burst window[cite: 1]."
-  },
-  SKIPPED_SUDDEN_DEATH: {
-    id: "SKIPPED_SUDDEN_DEATH",
-    title_es: "Ignoraste el proc gratuito de Sudden Death",
-    tip_es: "Lanza Execute en cuanto salte Sudden Death para evitar que el siguiente autoataque sobreescriba el proc y se pierda[cite: 1].",
-    title_en: "You ignored a free Sudden Death proc",
-    tip_en: "Cast Execute immediately on Sudden Death procs[cite: 1]."
-  },
-  UNNECESSARY_FILLER: {
-    id: "UNNECESSARY_FILLER",
-    title_es: "Usaste Slam en AoE o cuando la APL pedía usar Cleave / Cooldowns",
-    tip_es: "En AoE con Fervor of Battle, Slam nunca se castea directamente; se castea Cleave en su lugar[cite: 1].",
-    title_en: "You cast hardcast Slam in AoE or when Cleave / major CDs were demanded",
-    tip_en: "In AoE with Fervor of Battle, Slam is never hardcast; Cleave is used exclusively[cite: 1]."
-  },
-  GENERAL_SUBOPTIMAL: {
-    id: "GENERAL_SUBOPTIMAL",
-    title_es: "Secuencia subóptima según la lista de prioridades de SimulationCraft",
-    tip_es: "La habilidad elegida no correspondía al orden matemático óptimo en función del estado de Furia y cooldowns[cite: 1].",
-    title_en: "Suboptimal ability choice according to SimulationCraft priority list",
-    tip_en: "The chosen ability deviated from the mathematical priority order based on current Rage, cooldowns, and active buffs[cite: 1]."
-  }
-};
-
-function getErrorTaxonomyTitle(key) {
-  const item = ERROR_TAXONOMY[key];
-  if (!item) return key;
-  return currentLang === "en" ? item.title_en : item.title_es;
-}
-
-function getErrorTaxonomyTip(key) {
-  const item = ERROR_TAXONOMY[key];
-  if (!item) return "";
-  return currentLang === "en" ? item.tip_en : item.tip_es;
-}
-
-// ==========================================
-// 4. REGISTRO MODULAR DE TALENTOS & HOOKS (SLAYER EXCLUSIVO)
-// ==========================================
-const TALENT_REGISTRY = {
-  bloodletting: { 
-    id: "bloodletting", 
-    name_es: "Bloodletting", 
-    name_en: "Bloodletting", 
-    category: "arms", 
-    hooks: {} 
-  },
-  broad_strokes: {
-    id: "broad_strokes",
-    name_es: "Broad Strokes",
-    name_en: "Broad Strokes",
-    category: "arms",
-    hooks: {
-      onSpellCast: (spell, s, logFn) => {
-        if (spell.id === "CS") {
-          const current = s.auras.sweepingStrikesCharges;
-          const toAdd = 6;
-          const newTotal = Math.min(18, current + toAdd);
-          const gained = newTotal - current;
-          s.auras.sweepingStrikesCharges = newTotal;
-          s.auras.sweepingStrikesTimer = 30.0;
-          if (gained > 0) {
-            triggerFCT(`+${gained} SS Charges`, "#e11d48");
-            logFn(
-              currentLang === "en" ? "Broad Strokes" : "Broad Strokes", 
-              "perfect", 
-              currentLang === "en" ? `+${gained} Sweeping Strikes charges (${newTotal}/18)` : `+${gained} cargas de Sweeping Strikes (${newTotal}/18)`
-            );
-          }
-        }
-      }
-    }
-  },
-  fervor_of_battle: {
-    id: "fervor_of_battle",
-    name_es: "Fervor of Battle",
-    name_en: "Fervor of Battle",
-    category: "arms",
-    hooks: {
-      onSpellCast: (spell, s, logFn) => {
-        if (spell.id === "CLEAVE" && s.targetCount >= 2) {
-          if (s.auras.heroicStrike) {
-            s.auras.heroicStrike = false;
-            triggerFCT("Fervor HS Consumed", "#38bdf8");
-            logFn(
-              currentLang === "en" ? "Fervor of Battle" : "Fervor of Battle", 
-              "perfect", 
-              currentLang === "en" ? "Cleave triggered Slam and consumed Heroic Strike proc" : "Cleave casteó Slam y consumió el proc de Heroic Strike"
-            );
-          }
-        }
-      }
-    }
-  },
-  sudden_death: {
-    id: "sudden_death",
-    name_es: "Sudden Death",
-    name_en: "Sudden Death",
-    category: "arms",
-    hooks: {
-      onAutoAttack: (s) => {
-        if (Math.random() < 0.15) {
-          if (s.auras.suddenDeath) {
-            s.wastedProcsCount++;
-          }
-          s.auras.suddenDeath = true;
-          playAudioFeedback("proc");
-          triggerFCT("¡SUDDEN DEATH!", "#eab308");
-        }
-      }
-    }
-  },
-  executioners_precision: {
-    id: "executioners_precision",
-    name_es: "Executioner's Precision",
-    name_en: "Executioner's Precision",
-    category: "arms",
-    hooks: {
-      onSpellCast: (spell, s, logFn) => {
-        if (spell.id === "EXECUTE") {
-          if (s.auras.executionersPrecision === 2) {
-            s.wastedPrecisionStacks++;
-          } else {
-            s.auras.executionersPrecision = Math.min(2, s.auras.executionersPrecision + 1);
-          }
-        } else if (spell.id === "MS" && s.auras.executionersPrecision > 0) {
-          logFn(
-            currentLang === "en" ? "Precision Consumed" : "Precision Consumida", 
-            "perfect", 
-            currentLang === "en" ? `Consumed x${s.auras.executionersPrecision} Executioner's Precision` : `Consumidos x${s.auras.executionersPrecision} Executioner's Precision`
-          );
-          s.auras.executionersPrecision = 0;
-        }
-      }
-    }
-  },
-  dreadnaught: { id: "dreadnaught", name_es: "Dreadnaught", name_en: "Dreadnaught", category: "arms", hooks: {} },
-  unhinged: {
-    id: "unhinged",
-    name_es: "Unhinged",
-    name_en: "Unhinged",
-    category: "arms",
-    hooks: {
-      onChannelTick: (channel, s, dt, logFn) => {
-        if (channel.name === "Bladestorm") {
-          if (channel.remaining <= channel.total * 0.66 && channel.unhingedCastsDone === 0) {
-            channel.unhingedCastsDone = 1;
-            s.auras.overpowerBuff = 0;
-            triggerFCT("Unhinged MS", "#c084fc");
-            logFn("Unhinged: Mortal Strike", "channel", currentLang === "en" ? "Auto-cast #1 by Bladestorm" : "Cast automático #1 por Bladestorm");
-          } else if (channel.remaining <= channel.total * 0.33 && channel.unhingedCastsDone === 1) {
-            channel.unhingedCastsDone = 2;
-            s.auras.overpowerBuff = 0;
-            triggerFCT("Unhinged MS", "#c084fc");
-            logFn("Unhinged: Mortal Strike", "channel", currentLang === "en" ? "Auto-cast #2 by Bladestorm" : "Cast automático #2 por Bladestorm");
-          }
-        }
-      }
-    }
-  },
-  anger_management: {
-    id: "anger_management",
-    name_es: "Anger Management",
-    name_en: "Anger Management",
-    category: "arms",
-    hooks: {
-      onRageSpent: (spent, s) => {
-        const cdr = (spent / 20) * 1.0;
-        if (s.cds.CS > 0) s.cds.CS = Math.max(0, s.cds.CS - cdr);
-        if (s.cds.AVATAR > 0) s.cds.AVATAR = Math.max(0, s.cds.AVATAR - cdr);
-        if (s.cds.BS > 0) s.cds.BS = Math.max(0, s.cds.BS - cdr);
-      }
-    }
-  },
-  frothing_berserker: {
-    id: "frothing_berserker",
-    name_es: "Frothing Berserker",
-    name_en: "Frothing Berserker",
-    category: "class",
-    hooks: {
-      onRageSpent: (spent, s) => { s.rage = Math.min(100, s.rage + (spent * 0.10)); }
-    }
-  },
-  tactician: {
-    id: "tactician",
-    name_es: "Tactician",
-    name_en: "Tactician",
-    category: "arms",
-    hooks: {
-      onRageSpent: (spent, s, logFn) => {
-        if (Math.random() < (spent * 0.014) && s.opCharges < 2) {
-          s.opCharges = Math.min(2, s.opCharges + 1);
-          playAudioFeedback("proc");
-          triggerFCT("¡TACTICIAN!", "#38bdf8");
-          logFn("Tactician Proc", "perfect", currentLang === "en" ? "Overpower charge refunded" : "Recarga de Overpower devuelta");
-        }
-      }
-    }
-  },
-  massacre: { id: "massacre", name_es: "Massacre (35% Execute)", name_en: "Massacre (35% Execute)", category: "arms", hooks: {} }
-};
-
-function dispatchTalentHook(hookName, ...args) {
-  for (let talentId of state.activeTalents) {
-    const talent = TALENT_REGISTRY[talentId];
-    if (talent && talent.hooks && typeof talent.hooks[hookName] === "function") {
-      talent.hooks[hookName](...args);
-    }
-  }
-}
-
-// ==========================================
-// 3 PRESETS REORDENADOS (CON BLOODLETTING BASE)
-// ==========================================
-const SLAYER_PRESETS = {
-  st_1t: {
-    targetCount: 1,
-    talents: ["bloodletting", "sudden_death", "executioners_precision", "dreadnaught", "unhinged", "anger_management", "frothing_berserker", "tactician"]
-  },
-  cleave_2t: {
-    targetCount: 2,
-    talents: ["bloodletting", "broad_strokes", "sudden_death", "executioners_precision", "dreadnaught", "unhinged", "anger_management", "frothing_berserker", "tactician"]
-  },
-  aoe_3t: {
-    targetCount: 3,
-    talents: ["bloodletting", "broad_strokes", "fervor_of_battle", "dreadnaught", "unhinged", "anger_management", "frothing_berserker", "tactician", "sudden_death", "executioners_precision"]
-  }
-};
-
-function loadPresetBuild(presetKey) {
-  const preset = SLAYER_PRESETS[presetKey];
-  if (!preset) return;
-  
-  state.targetCount = preset.targetCount;
-  document.getElementById("target-count-select").value = preset.targetCount;
-  state.activeTalents = new Set(preset.talents);
-  
-  renderTalentChips();
-  resetCombat();
-}
-
-function toggleTalentChip(talentId) {
-  if (state.activeTalents.has(talentId)) {
-    state.activeTalents.delete(talentId);
-  } else {
-    state.activeTalents.add(talentId);
-  }
-  renderTalentChips();
-}
-
-function renderTalentChips() {
-  const container = document.getElementById("talent-chips-container");
-  container.innerHTML = "";
-  for (let key in TALENT_REGISTRY) {
-    const tItem = TALENT_REGISTRY[key];
-    const chip = document.createElement("div");
-    const isActive = state.activeTalents.has(tItem.id);
-    const displayName = currentLang === "en" ? tItem.name_en : tItem.name_es;
-    chip.className = `talent-chip ${isActive ? "active" : ""}`;
-    chip.innerText = `${isActive ? "✓ " : ""}${displayName}`;
-    chip.onclick = () => toggleTalentChip(tItem.id);
-    container.appendChild(chip);
-  }
-}
-
-// ==========================================
-// 5. BASE DE DATOS DE HABILIDADES
-// ==========================================
 const SPELL_DB = {
-  CS: { id: "CS", name: "Colossus Smash", cdBase: 45, scalesWithHaste: false, rageCost: 0, rageGen: 0, triggersGCD: true },
-  MS: { id: "MS", name: "Mortal Strike", cdBase: 6, scalesWithHaste: true, rageCost: 30, rageGen: 0, triggersGCD: true },
-  OP: { id: "OP", name: "Overpower", cdBase: 12, scalesWithHaste: true, maxCharges: 2, rageCost: 0, rageGen: 10, triggersGCD: true },
-  CLEAVE: { id: "CLEAVE", name: "Cleave", cdBase: 6, scalesWithHaste: true, rageCost: 20, rageGen: 0, triggersGCD: true },
-  BS: { id: "BS", name: "Bladestorm", cdBase: 90, scalesWithHaste: false, rageCost: 0, rageGen: 20, triggersGCD: true, isChanneled: true, channelDuration: 4.3 },
-  SS: { id: "SS", name: "Sweeping Strikes", cdBase: 30, scalesWithHaste: false, rageCost: 0, rageGen: 0, triggersGCD: true },
-  SLAM: { id: "SLAM", name: "Slam", cdBase: 0, scalesWithHaste: false, rageCost: 20, rageGen: 0, triggersGCD: true },
-  HS: { id: "HS", name: "Heroic Strike", cdBase: 0, scalesWithHaste: false, rageCost: 20, rageGen: 0, triggersGCD: true },
-  AVATAR: { id: "AVATAR", name: "Avatar", cdBase: 90, scalesWithHaste: false, rageCost: 0, rageGen: 0, triggersGCD: false },
-  EXECUTE: { id: "EXECUTE", name: "Execute", cdBase: 0, scalesWithHaste: false, rageCost: 20, rageGen: 0, triggersGCD: true }
+  MS: { id: "MS", name: "Mortal Strike", rageCost: 30, rageGen: 0, cdBase: 6.0, scalesWithHaste: true, triggersGCD: true, defaultKey: "1", icon: "https://wow.zamimg.com/images/wow/icons/large/ability_warrior_savageblow.jpg" },
+  OP: { id: "OP", name: "Overpower", rageCost: 0, rageGen: 0, cdBase: 12.0, scalesWithHaste: true, triggersGCD: true, defaultKey: "2", icon: "https://wow.zamimg.com/images/wow/icons/large/ability_meleedamage.jpg" },
+  EXECUTE: { id: "EXECUTE", name: "Execute", rageCost: 20, rageGen: 0, cdBase: 0, scalesWithHaste: false, triggersGCD: true, defaultKey: "3", icon: "https://wow.zamimg.com/images/wow/icons/large/inv_sword_48.jpg" },
+  CS: { id: "CS", name: "Colossus Smash", rageCost: 0, rageGen: 10, cdBase: 45.0, scalesWithHaste: false, triggersGCD: true, defaultKey: "4", icon: "https://wow.zamimg.com/images/wow/icons/large/ability_warrior_colossussmash.jpg" },
+  BS: { id: "BS", name: "Bladestorm", rageCost: 0, rageGen: 20, cdBase: 90.0, scalesWithHaste: false, triggersGCD: true, channelDuration: 3.8, defaultKey: "5", icon: "https://wow.zamimg.com/images/wow/icons/large/ability_warrior_bladestorm.jpg" },
+  CLEAVE: { id: "CLEAVE", name: "Cleave", rageCost: 20, rageGen: 0, cdBase: 6.0, scalesWithHaste: true, triggersGCD: true, defaultKey: "Q", icon: "https://wow.zamimg.com/images/wow/icons/large/ability_warrior_cleave.jpg" },
+  SLAM: { id: "SLAM", name: "Slam", rageCost: 20, rageGen: 0, cdBase: 0, scalesWithHaste: false, triggersGCD: true, defaultKey: "E", icon: "https://wow.zamimg.com/images/wow/icons/large/ability_warrior_decisivestrike.jpg" },
+  HS: { id: "HS", name: "Heroic Strike", rageCost: 15, rageGen: 0, cdBase: 0, scalesWithHaste: false, triggersGCD: true, defaultKey: "E", icon: "https://wow.zamimg.com/images/wow/icons/large/ability_rogue_ambush.jpg" },
+  SS: { id: "SS", name: "Sweeping Strikes", rageCost: 0, rageGen: 0, cdBase: 30.0, scalesWithHaste: false, triggersGCD: false, defaultKey: "R", icon: "https://wow.zamimg.com/images/wow/icons/large/ability_warrior_cleave.jpg" },
+  AVATAR: { id: "AVATAR", name: "Avatar", rageCost: 0, rageGen: 20, cdBase: 90.0, scalesWithHaste: false, triggersGCD: false, defaultKey: "F", icon: "https://wow.zamimg.com/images/wow/icons/large/warrior_talent_icon_avatar.jpg" }
 };
 
-let userSlots = [
-  { spellId: "CS", key: "1" },
-  { spellId: "MS", key: "2" },
-  { spellId: "OP", key: "3" },
-  { spellId: "CLEAVE", key: "4" },
-  { spellId: "BS", key: "5" },
-  { spellId: "SS", key: "Q" },
-  { spellId: "SLAM", key: "E" },
-  { spellId: "AVATAR", key: "R" },
-  { spellId: "EXECUTE", key: "F" }
-];
+const AURA_ICONS = {
+  rend: "https://wow.zamimg.com/images/wow/icons/large/ability_gouge.jpg",
+  cs: "https://wow.zamimg.com/images/wow/icons/large/ability_warrior_colossussmash.jpg",
+  slayer: "https://wow.zamimg.com/images/wow/icons/large/inv_sword_11.jpg",
+  sd: "https://wow.zamimg.com/images/wow/icons/large/ability_warrior_improveddisciplines.jpg",
+  hs: "https://wow.zamimg.com/images/wow/icons/large/ability_rogue_ambush.jpg",
+  precision: "https://wow.zamimg.com/images/wow/icons/large/ability_warrior_intensifyrage.jpg",
+  ss: "https://wow.zamimg.com/images/wow/icons/large/ability_warrior_cleave.jpg"
+};
 
-let isEditMode = false;
-let editingSlotIndex = null;
+const ARMS_TALENT_TREE = {
+  tactician: { id: "tactician", name_en: "Tactician", name_es: "Estratega", desc_en: "Rage spent has 1.4% chance to reset Overpower CD.", desc_es: "Cada punto de ira gastado tiene un 1.4% de reiniciar Overpower." },
+  battlelord: { id: "battlelord", name_en: "Battlelord", name_es: "Señor de la Batalla", desc_en: "Overpower has 35% chance to reset MS & reduce rage cost.", desc_es: "Overpower tiene 35% de reiniciar Golpe Mortal y reducir su coste." },
+  slayer_strike: { id: "slayer_strike", name_en: "Slayer's Strike", name_es: "Golpe de Asolador", desc_en: "MS/OP apply stacks increasing damage taken.", desc_es: "Golpe Mortal y Overpower aplican vulnerabilidad acumulable." },
+  unhinged: { id: "unhinged", name_en: "Unhinged", name_es: "Desquiciado", desc_en: "Bladestorm casts 2 automatic Mortal Strikes.", desc_es: "Filotormenta lanza 2 Golpes Mortales automáticos." },
+  anger_management: { id: "anger_management", name_en: "Anger Management", name_es: "Control de la Ira", desc_en: "Every 20 Rage spent reduces CS/Avatar/BS CD by 1s.", desc_es: "Cada 20 de Ira gastada reduce el CD de CS/Avatar/BS en 1s." },
+  executioners_precision: { id: "executioners_precision", name_en: "Executioner's Precision", name_es: "Precisión de Ejecutor", desc_en: "Execute increases damage of next MS by up to 2 stacks.", desc_es: "Ejecutar aumenta el daño del siguiente Golpe Mortal (hasta 2 cargas)." },
+  sudden_death: { id: "sudden_death", name_en: "Sudden Death", name_es: "Muerte Súbita", desc_en: "Auto-attacks have a chance to proc free Execute.", desc_es: "Los ataques básicos pueden otorgar Ejecutar gratuito." },
+  fatality: { id: "fatality", name_en: "Fatality", name_es: "Fatalidad", desc_en: "Auto-attacks build Fatality stacks detonated by Execute.", desc_es: "Los ataques básicos acumulan daño detonado por Ejecutar." },
+  frothing_berserker: { id: "frothing_berserker", name_en: "Frothing Berserker", name_es: "Rabioso Espumante", desc_en: "Refunds 10% of Rage spent on abilities.", desc_es: "Reembolsa el 10% de la Ira gastada en facultades." },
+  in_for_the_kill: { id: "in_for_the_kill", name_en: "In For The Kill", name_es: "A Matar", desc_en: "Colossus Smash grants 10% Haste for 10s.", desc_es: "Machaque Colosal otorga 10% de Celeridad durante 10s." }
+};
 
-let state = {
-  targetCount: 1, // 1 (ST), 2 (Cleave), 3 (3+ AoE)
+const DEFAULT_CDM_LAYOUT = {
+  resource: { x: 230, y: 320, scale: 1.0, visible: true, orientation: "horizontal" },
+  cdmPrimary: { x: 180, y: 380, scale: 1.0, visible: true, orientation: "horizontal", slots: ["CS", "MS", "OP", "EXECUTE", "BS"] },
+  cdmSecondary: { x: 250, y: 450, scale: 1.0, visible: true, orientation: "horizontal", slots: ["CLEAVE", "SLAM", "SS", "AVATAR"] },
+  playerAuras: { x: 500, y: 320, scale: 1.0, visible: true, orientation: "horizontal" },
+  targetAuras: { x: 50, y: 320, scale: 1.0, visible: true, orientation: "horizontal" }
+};
+
+let currentLayout = JSON.parse(JSON.stringify(DEFAULT_CDM_LAYOUT));
+let customKeybinds = { CS: "4", MS: "1", OP: "2", EXECUTE: "3", BS: "5", CLEAVE: "Q", SLAM: "E", HS: "E", SS: "R", AVATAR: "F" };
+
+let isCDMEditMode = false;
+let draggedSlotData = null;
+let activeDragFrame = null;
+let dragOffset = { x: 0, y: 0 };
+let selectedFrameId = null;
+
+const state = {
+  targetCount: 1,
   targetHP: 100,
+  enforceRange: true,
+  inMeleeRange: true,
   rage: 40,
-  stats: { haste: 31.0, crit: 27.2, mastery: 21.7, vers: 4.5 },
-  activeTalents: new Set(["bloodletting", "sudden_death", "executioners_precision", "dreadnaught", "unhinged", "anger_management", "frothing_berserker", "tactician"]),
+  stats: { haste: 12.0, crit: 25.0 },
+  gcdTotal: 1.34,
   gcdRemaining: 0,
-  gcdTotal: 1.14,
   gcdBecameReadyAt: 0,
-  swingTimer: 2.186,
-  swingTotal: 2.186,
-  simulatedPing: 40,
+  swingTotal: 2.55,
+  swingTimer: 2.55,
   spellQueueWindow: 0.40,
+  simulatedPing: 40,
+  procGraceWindow: 0.40,
+  channeling: null,
   queuedSpell: null,
+  battlelordCostReduction: false,
   cds: { CS: 0, MS: 0, CLEAVE: 0, BS: 0, SS: 0, AVATAR: 0 },
   opCharges: 2,
   opRecharge: 0,
-  channeling: null,
-  auras: { 
-    colossusSmash: 0, 
-    rendDot: 0, 
-    avatar: 0, 
-    overpowerBuff: 0, 
-    imminentDemise: 0, 
-    executionersPrecision: 0, 
+  procTimestamps: { suddenDeath: 0, heroicStrike: 0 },
+  auras: {
+    colossusSmash: 0,
+    rendDot: 0,
+    avatar: 0,
+    overpowerBuff: 0,
+    fatalityStacks: 0,
+    executionersPrecision: 0,
     sweepingStrikesCharges: 0,
     sweepingStrikesTimer: 0,
-    suddenDeath: false, 
-    heroicStrike: false 
+    slayerDebuff: 0,
+    slayerTimer: 0,
+    suddenDeath: 0,
+    heroicStrike: false
   },
+  activeTalents: new Set(["tactician", "battlelord", "slayer_strike", "unhinged", "anger_management", "executioners_precision", "sudden_death", "fatality", "frothing_berserker", "in_for_the_kill"]),
   score: 0,
   combo: 0,
   maxCombo: 0,
-  totalCasts: 0,
-  perfectCasts: 0,
   combatActive: false,
   combatPaused: false,
   combatTime: 0,
   rageCapTime: 0,
   rendUptimeAccum: 0,
+  rendDownTime: 0,
+  msHeldTime: 0,
   gcdIdleAccum: 0,
   successfulCasts: 0,
+  totalCasts: 0,
+  perfectCasts: 0,
   wastedProcsCount: 0,
-  msHeldTime: 0,
-  rendDownTime: 0,
   wastedPrecisionStacks: 0,
   mistakeOccurrences: {},
   totalMistakes: 0,
-  allCastLogs: [],
-  activeTimelineFilter: null
+  allCastLogs: []
 };
 
-function getSpellCDMax(spellId) {
-  const spell = SPELL_DB[spellId];
-  if (!spell) return 0;
-  if (spell.scalesWithHaste) {
-    const hasteFactor = 1 + (state.stats.haste / 100);
-    return spell.cdBase / hasteFactor;
+// Safe DOM helpers
+function setText(id, text) {
+  const el = document.getElementById(id);
+  if (el) el.innerText = text;
+}
+function setHTML(id, html) {
+  const el = document.getElementById(id);
+  if (el) el.innerHTML = html;
+}
+
+// Global movement tracking
+const moveState = { w: false, a: false, s: false, d: false };
+
+window.addEventListener("keydown", (e) => {
+  if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT" || isCDMEditMode) return;
+  const k = (e.key || "").toLowerCase();
+  const c = e.code || "";
+  if (k === "w" || c === "KeyW" || k === "arrowup" || c === "ArrowUp") moveState.w = true;
+  if (k === "s" || c === "KeyS" || k === "arrowdown" || c === "ArrowDown") moveState.s = true;
+  if (k === "a" || c === "KeyA" || k === "arrowleft" || c === "ArrowLeft") moveState.a = true;
+  if (k === "d" || c === "KeyD" || k === "arrowright" || c === "ArrowRight") moveState.d = true;
+});
+
+window.addEventListener("keyup", (e) => {
+  const k = (e.key || "").toLowerCase();
+  const c = e.code || "";
+  if (k === "w" || c === "KeyW" || k === "arrowup" || c === "ArrowUp") moveState.w = false;
+  if (k === "s" || c === "KeyS" || k === "arrowdown" || c === "ArrowDown") moveState.s = false;
+  if (k === "a" || c === "KeyA" || k === "arrowleft" || c === "ArrowLeft") moveState.a = false;
+  if (k === "d" || c === "KeyD" || k === "arrowright" || c === "ArrowRight") moveState.d = false;
+});
+
+window.addEventListener("blur", () => {
+  moveState.w = false; moveState.a = false; moveState.s = false; moveState.d = false;
+  isRightDragging = false;
+});
+
+// ==========================================
+// 1. THREE.JS 3D ENGINE & THIRD-PERSON CAMERA
+// ==========================================
+let scene3D, camera3D, renderer3D;
+let playerMesh3D, bossMesh3D, meleeRing3D, bsAuraMesh3D;
+let particles3D = [];
+let lungeOffset = 0;
+let isThreeLoaded = false;
+let walkBobTimer = 0;
+
+// Camera state: Third-person chase cam anchored to character
+let camYaw = 0;
+let camPitch = 0.40;
+let camDistance = 6.2;
+let isRightDragging = false;
+let lastMousePos = { x: 0, y: 0 };
+
+const MELEE_DISTANCE_YARDS = 5.0;
+const THREE_MELEE_RADIUS = 4.4;
+
+function init3DArena() {
+  const container = document.getElementById("threejs-canvas-layer");
+  if (!container) return;
+
+  const rect = container.getBoundingClientRect();
+  const w = rect.width > 0 ? rect.width : (container.clientWidth || 800);
+  const h = rect.height > 0 ? rect.height : (container.clientHeight || 580);
+
+  if (typeof THREE !== "undefined") {
+    try {
+      scene3D = new THREE.Scene();
+      scene3D.background = new THREE.Color(0x050711);
+
+      camera3D = new THREE.PerspectiveCamera(54, w / h, 0.1, 100);
+
+      renderer3D = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: "high-performance" });
+      renderer3D.setSize(w, h);
+      renderer3D.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer3D.shadowMap.enabled = true;
+
+      container.innerHTML = "";
+      container.appendChild(renderer3D.domElement);
+
+      const ambLight = new THREE.AmbientLight(0xffffff, 0.65);
+      scene3D.add(ambLight);
+
+      const dirLight = new THREE.DirectionalLight(0xffffff, 0.95);
+      dirLight.position.set(8, 14, 8);
+      dirLight.castShadow = true;
+      scene3D.add(dirLight);
+
+      // Raid platform (slate stone cylinder)
+      const platGeo = new THREE.CylinderGeometry(9.5, 9.5, 0.4, 48);
+      const platMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.8 });
+      const platform = new THREE.Mesh(platGeo, platMat);
+      platform.position.y = -0.2;
+      platform.receiveShadow = true;
+      scene3D.add(platform);
+
+      // High-contrast raid grid so floor movement is clearly visible
+      const gridHelper = new THREE.GridHelper(18, 18, 0x38bdf8, 0x334155);
+      gridHelper.position.y = 0.01;
+      scene3D.add(gridHelper);
+
+      // Boss (3D Red Orb with evil eyes)
+      const bossGroup = new THREE.Group();
+      const bossGeo = new THREE.SphereGeometry(1.3, 32, 32);
+      const bossMat = new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.35, metalness: 0.25 });
+      bossMesh3D = new THREE.Mesh(bossGeo, bossMat);
+      bossMesh3D.position.y = 1.3;
+      bossMesh3D.castShadow = true;
+      bossGroup.add(bossMesh3D);
+
+      const ringGeo = new THREE.RingGeometry(THREE_MELEE_RADIUS - 0.2, THREE_MELEE_RADIUS, 64);
+      const ringMat = new THREE.MeshBasicMaterial({ color: 0x22c55e, side: THREE.DoubleSide, transparent: true, opacity: 0.85 });
+      meleeRing3D = new THREE.Mesh(ringGeo, ringMat);
+      meleeRing3D.rotation.x = -Math.PI / 2;
+      meleeRing3D.position.y = 0.02;
+      bossGroup.add(meleeRing3D);
+
+      bossGroup.position.set(0, 0, -2.4);
+      scene3D.add(bossGroup);
+
+      // Player Group: Head, Body and Weapon
+      playerMesh3D = new THREE.Group();
+      
+      const pBodyGeo = new THREE.BoxGeometry(0.85, 1.0, 0.85);
+      const pBodyMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.5 });
+      const pBody = new THREE.Mesh(pBodyGeo, pBodyMat);
+      pBody.position.y = 0.5;
+      pBody.castShadow = true;
+      playerMesh3D.add(pBody);
+
+      const helmGeo = new THREE.BoxGeometry(0.5, 0.45, 0.55);
+      const helmMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.3 });
+      const helm = new THREE.Mesh(helmGeo, helmMat);
+      helm.position.set(0, 1.15, -0.05);
+      playerMesh3D.add(helm);
+
+      const swordGeo = new THREE.BoxGeometry(0.1, 1.4, 0.22);
+      const swordMat = new THREE.MeshStandardMaterial({ color: 0xcbd5e1, metalness: 0.85, roughness: 0.2 });
+      const sword = new THREE.Mesh(swordGeo, swordMat);
+      sword.position.set(0.65, 0.7, 0.2);
+      sword.rotation.x = 0.35;
+      playerMesh3D.add(sword);
+
+      const bsGeo = new THREE.TorusGeometry(1.65, 0.06, 8, 32);
+      const bsMat = new THREE.MeshBasicMaterial({ color: 0xa855f7, transparent: true, opacity: 0.85 });
+      bsAuraMesh3D = new THREE.Mesh(bsGeo, bsMat);
+      bsAuraMesh3D.rotation.x = Math.PI / 2;
+      bsAuraMesh3D.position.y = 0.6;
+      bsAuraMesh3D.visible = false;
+      playerMesh3D.add(bsAuraMesh3D);
+
+      playerMesh3D.position.set(0, 0, 0.8);
+      scene3D.add(playerMesh3D);
+
+      isThreeLoaded = true;
+      window.addEventListener("resize", onThreeResize);
+    } catch (e) {
+      console.error("ThreeJS init failure. Fallback engaged.", e);
+      isThreeLoaded = false;
+    }
   }
-  return spell.cdBase;
-}
 
-function recalculateDerivedStats() {
-  const hasteFactor = 1 + (state.stats.haste / 100);
-  state.gcdTotal = Math.max(0.75, 1.5 / hasteFactor);
-  state.swingTotal = 2.86 / hasteFactor;
-  if (!state.combatActive) state.swingTimer = state.swingTotal;
-  document.getElementById("gcd-val-text").innerText = state.gcdTotal.toFixed(2) + "s";
-  document.getElementById("swing-val-text").innerText = state.swingTotal.toFixed(2) + "s";
-}
-
-function updateStats() {
-  state.stats.haste = parseFloat(document.getElementById("stat-haste").value) || 0;
-  state.stats.crit = parseFloat(document.getElementById("stat-crit").value) || 0;
-  state.stats.mastery = parseFloat(document.getElementById("stat-mastery").value) || 0;
-  state.stats.vers = parseFloat(document.getElementById("stat-vers").value) || 0;
-  recalculateDerivedStats();
-}
-
-function updatePing(val) {
-  const p = parseInt(val);
-  state.simulatedPing = isNaN(p) ? 0 : Math.max(0, p);
-}
-
-function updateSQW(val) {
-  const s = parseInt(val);
-  state.spellQueueWindow = isNaN(s) ? 0.40 : Math.max(0, s / 1000);
-}
-
-function updateCombatScenario() {
-  state.targetCount = parseInt(document.getElementById("target-count-select").value) || 1;
-  state.targetHP = parseInt(document.getElementById("dummy-hp").value) || 100;
-  resetCombat();
-}
-
-function triggerFCT(text, color = "#facc15") {
-  const layer = document.getElementById("fct-layer");
-  const el = document.createElement("div");
-  el.className = "fct-text";
-  el.innerText = text;
-  el.style.color = color;
-  el.style.left = `calc(50% + ${(Math.random() * 120 - 60)}px)`;
-  el.style.top = `calc(52% + ${(Math.random() * 40 - 20)}px)`;
-  layer.appendChild(el);
-  setTimeout(() => el.remove(), 850);
-}
-
-function togglePauseCombat() {
-  if (!state.combatActive) return;
-  state.combatPaused = !state.combatPaused;
-  const btn = document.getElementById("btn-pause-toggle");
-  if (state.combatPaused) {
-    btn.innerText = t("btnResume");
-    btn.classList.add("btn-active");
-    updateHUD(t("hudPaused"), "#eab308");
-    renderMostCommonProblems();
-  } else {
-    btn.innerText = t("btnPause");
-    btn.classList.remove("btn-active");
-    updateHUD(t("hudResumed"), "var(--perfect)");
-  }
-}
-
-function toggleEditMode() {
-  isEditMode = !isEditMode;
-  const btn = document.getElementById("btn-edit-mode");
-  const addBtn = document.getElementById("btn-add-slot");
-  if (isEditMode) {
-    btn.classList.add("btn-active");
-    btn.innerText = t("btnFinishEdit");
-    addBtn.style.display = "inline-block";
-  } else {
-    btn.classList.remove("btn-active");
-    btn.innerText = t("btnEditBar");
-    addBtn.style.display = "none";
-  }
-  buildActionBarUI();
-}
-
-function addNewSlot() {
-  userSlots.push({ spellId: "SLAM", key: "?" });
-  buildActionBarUI();
-}
-
-function removeSlot(idx) {
-  userSlots.splice(idx, 1);
-  buildActionBarUI();
-}
-
-function moveSlot(idx, dir) {
-  const target = idx + dir;
-  if (target < 0 || target >= userSlots.length) return;
-  const temp = userSlots[idx];
-  userSlots[idx] = userSlots[target];
-  userSlots[target] = temp;
-  buildActionBarUI();
-}
-
-function openEditSlotModal(idx) {
-  editingSlotIndex = idx;
-  const slot = userSlots[idx];
-  const select = document.getElementById("modal-spell-select");
-  select.innerHTML = "";
-  for (let key in SPELL_DB) {
-    const opt = document.createElement("option");
-    opt.value = key;
-    opt.innerText = SPELL_DB[key].name;
-    if (key === slot.spellId) opt.selected = true;
-    select.appendChild(opt);
+  if (!isThreeLoaded) {
+    container.innerHTML = "";
+    const canvas2d = document.createElement("canvas");
+    canvas2d.id = "fallback-2d-canvas";
+    canvas2d.width = w;
+    canvas2d.height = h;
+    container.appendChild(canvas2d);
   }
 
-  const keyInput = document.getElementById("modal-key-input");
-  keyInput.value = slot.key;
-  keyInput.onkeydown = (e) => {
+  setupCameraMouseControls();
+}
+
+function onThreeResize() {
+  if (!isThreeLoaded || !renderer3D || !camera3D) return;
+  const container = document.getElementById("threejs-canvas-layer");
+  if (!container) return;
+  const w = container.clientWidth || 800;
+  const h = container.clientHeight || 580;
+  camera3D.aspect = w / h;
+  camera3D.updateProjectionMatrix();
+  renderer3D.setSize(w, h);
+}
+
+function setupCameraMouseControls() {
+  const gameWin = document.getElementById("game-window");
+  if (!gameWin) return;
+
+  gameWin.addEventListener("mousedown", (e) => {
+    if (e.target.closest(".action-slot") || e.target.closest(".cdm-frame") || isCDMEditMode) return;
+    if (e.button === 0 || e.button === 2) {
+      isRightDragging = true;
+      lastMousePos.x = e.clientX;
+      lastMousePos.y = e.clientY;
+    }
+  });
+
+  window.addEventListener("mousemove", (e) => {
+    if (!isRightDragging) return;
+    const dx = e.clientX - lastMousePos.x;
+    const dy = e.clientY - lastMousePos.y;
+    lastMousePos.x = e.clientX;
+    lastMousePos.y = e.clientY;
+
+    camYaw -= dx * 0.006;
+    camPitch += dy * 0.005;
+    camPitch = Math.max(0.06, Math.min(1.25, camPitch));
+  });
+
+  window.addEventListener("mouseup", (e) => {
+    if (e.button === 0 || e.button === 2) isRightDragging = false;
+  });
+
+  gameWin.addEventListener("wheel", (e) => {
+    if (isCDMEditMode) return;
     e.preventDefault();
-    keyInput.value = e.key.toUpperCase();
-  };
+    camDistance = Math.max(2.5, Math.min(13.0, camDistance + e.deltaY * 0.006));
+  }, { passive: false });
 
-  document.getElementById("slot-modal").style.display = "flex";
+  gameWin.addEventListener("contextmenu", (e) => {
+    if (!e.target.closest(".action-slot")) e.preventDefault();
+  });
 }
 
-function closeModal() {
-  document.getElementById("slot-modal").style.display = "none";
-  editingSlotIndex = null;
+let player2D = { x: 0, z: 0.8 };
+
+function updateArenaEntities(dt) {
+  if (isNaN(dt) || dt <= 0 || dt > 0.1) dt = 0.016;
+
+  const fwdX = -Math.sin(camYaw);
+  const fwdZ = -Math.cos(camYaw);
+  const rightX = Math.cos(camYaw);
+  const rightZ = -Math.sin(camYaw);
+
+  let moveX = 0, moveZ = 0;
+  if (moveState.w) { moveX += fwdX; moveZ += fwdZ; }
+  if (moveState.s) { moveX -= fwdX; moveZ -= fwdZ; }
+  if (moveState.a) { moveX -= rightX; moveZ -= rightZ; }
+  if (moveState.d) { moveX += rightX; moveZ += rightZ; }
+
+  const moveLen = Math.hypot(moveX, moveZ);
+  const speed = 5.2;
+
+  if (moveLen > 0.001) {
+    player2D.x += (moveX / moveLen) * speed * dt;
+    player2D.z += (moveZ / moveLen) * speed * dt;
+
+    const rLimit = 8.2;
+    const distOrigin = Math.hypot(player2D.x, player2D.z);
+    if (distOrigin > rLimit) {
+      player2D.x = (player2D.x / distOrigin) * rLimit;
+      player2D.z = (player2D.z / distOrigin) * rLimit;
+    }
+
+    walkBobTimer += dt * 12;
+
+    if (isThreeLoaded && playerMesh3D) {
+      if (isRightDragging) {
+        playerMesh3D.rotation.y = camYaw + Math.PI;
+      } else {
+        playerMesh3D.rotation.y = Math.atan2(moveX, moveZ);
+      }
+      playerMesh3D.position.y = Math.sin(walkBobTimer) * 0.06;
+    }
+  } else {
+    if (isThreeLoaded && playerMesh3D) {
+      if (isRightDragging) playerMesh3D.rotation.y = camYaw + Math.PI;
+      playerMesh3D.position.y = 0;
+    }
+  }
+
+  const curDist = Math.hypot(player2D.x, player2D.z - (-2.4));
+  state.inMeleeRange = !state.enforceRange || (curDist <= THREE_MELEE_RADIUS);
+
+  const yds = ((curDist / THREE_MELEE_RADIUS) * MELEE_DISTANCE_YARDS).toFixed(1);
+  setText("arena-dist-text", `${yds} yds`);
+
+  const badge = document.getElementById("range-badge");
+  if (badge) {
+    badge.className = `range-pill ${state.inMeleeRange ? 'range-in' : 'range-out'}`;
+    badge.innerText = state.inMeleeRange ? t("rangeIn") : t("rangeOut");
+  }
+
+  if (isThreeLoaded && playerMesh3D && scene3D && camera3D) {
+    if (lungeOffset > 0) lungeOffset = Math.max(0, lungeOffset - dt * 4);
+    playerMesh3D.position.x = player2D.x;
+    playerMesh3D.position.z = player2D.z;
+
+    if (meleeRing3D) {
+      meleeRing3D.material.color.setHex(state.inMeleeRange ? 0x22c55e : 0xef4444);
+    }
+
+    if (bsAuraMesh3D) {
+      if (state.channeling && state.channeling.name === "Bladestorm") {
+        bsAuraMesh3D.visible = true;
+        bsAuraMesh3D.rotation.z += dt * 14;
+        playerMesh3D.rotation.y += dt * 10;
+      } else {
+        bsAuraMesh3D.visible = false;
+      }
+    }
+
+    const pX = playerMesh3D.position.x;
+    const pY = playerMesh3D.position.y;
+    const pZ = playerMesh3D.position.z;
+
+    const offX = Math.sin(camYaw) * Math.cos(camPitch) * camDistance;
+    const offZ = Math.cos(camYaw) * Math.cos(camPitch) * camDistance;
+    const offY = Math.sin(camPitch) * camDistance;
+
+    camera3D.position.set(pX + offX, pY + 0.9 + offY, pZ + offZ);
+    camera3D.lookAt(pX, pY + 0.9, pZ);
+
+    particles3D = particles3D.filter(p => {
+      p.mesh.position.addScaledVector(p.vel, dt);
+      p.life -= dt;
+      p.mesh.scale.multiplyScalar(0.95);
+      if (p.life <= 0) {
+        scene3D.remove(p.mesh);
+        return false;
+      }
+      return true;
+    });
+
+    renderer3D.render(scene3D, camera3D);
+  } else if (!isThreeLoaded) {
+    draw2DFallbackArena();
+  }
 }
 
-function saveModalConfig() {
-  if (editingSlotIndex === null) return;
-  const spellId = document.getElementById("modal-spell-select").value;
-  const key = document.getElementById("modal-key-input").value.trim() || "?";
-  userSlots[editingSlotIndex] = { spellId, key };
-  closeModal();
-  buildActionBarUI();
+function draw2DFallbackArena() {
+  const canvas = document.getElementById("fallback-2d-canvas");
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+  const w = canvas.width, h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
+
+  const centerX = w / 2, centerY = h / 2;
+  const scale = 22;
+
+  const bx = centerX, by = centerY - 2.4 * scale;
+  ctx.beginPath();
+  ctx.arc(bx, by, THREE_MELEE_RADIUS * scale, 0, Math.PI * 2);
+  ctx.strokeStyle = state.inMeleeRange ? "rgba(34, 197, 94, 0.4)" : "rgba(239, 68, 68, 0.5)";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(bx, by, 24, 0, Math.PI * 2);
+  ctx.fillStyle = "#ef4444";
+  ctx.fill();
+
+  const px = centerX + player2D.x * scale, py = centerY + player2D.z * scale;
+  ctx.fillStyle = "#64748b";
+  ctx.fillRect(px - 11, py - 11, 22, 22);
 }
 
-function buildActionBarUI() {
-  const container = document.getElementById("action-bar");
+function spawn3DImpactFX(colorHex = 0xfacc15) {
+  if (!isThreeLoaded || !scene3D) return;
+  lungeOffset = 0.4;
+  const count = 12;
+  const geo = new THREE.BoxGeometry(0.08, 0.08, 0.08);
+  const mat = new THREE.MeshBasicMaterial({ color: colorHex });
+
+  for (let i = 0; i < count; i++) {
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(
+      (Math.random() - 0.5) * 0.8,
+      1.2 + (Math.random() - 0.5) * 0.8,
+      -2.4 + (Math.random() - 0.5) * 0.8
+    );
+    scene3D.add(mesh);
+    particles3D.push({
+      mesh,
+      vel: new THREE.Vector3((Math.random() - 0.5) * 4, Math.random() * 3 + 1, (Math.random() - 0.5) * 4),
+      life: 0.45
+    });
+  }
+}
+
+// ==========================================================
+// 2. CDM OVERLAY & DRAG/DROP MANAGEMENT
+// ==========================================
+function toggleCDMEditMode() {
+  isCDMEditMode = !isCDMEditMode;
+  document.body.classList.toggle("cdm-edit-mode", isCDMEditMode);
+  setText("btn-toggle-cdm", isCDMEditMode ? t("btnCdmEditOn") : t("btnCdmEditOff"));
+  const btn = document.getElementById("btn-toggle-cdm");
+  if (btn) btn.classList.toggle("btn-active", isCDMEditMode);
+
+  if (!isCDMEditMode) {
+    deselectFrame();
+    saveCDMToStorage();
+  }
+  renderAllCDMPanels();
+}
+
+function renderAllCDMPanels() {
+  renderPanelSlots("cdmPrimary");
+  renderPanelSlots("cdmSecondary");
+  applyCurrentLayoutToDOM();
+}
+
+function renderPanelSlots(panelId) {
+  const container = document.getElementById(`container-${panelId}`);
+  if (!container) return;
   container.innerHTML = "";
 
-  userSlots.forEach((slot, idx) => {
-    const spell = SPELL_DB[slot.spellId];
+  const slotList = (currentLayout[panelId] && currentLayout[panelId].slots) ? currentLayout[panelId].slots : DEFAULT_CDM_LAYOUT[panelId].slots;
+  slotList.forEach((spellId, idx) => {
+    let effId = spellId;
+    if (spellId === "SLAM" && state.auras.heroicStrike) effId = "HS";
+    const spell = SPELL_DB[effId];
     if (!spell) return;
 
     const slotEl = document.createElement("div");
     slotEl.className = "action-slot";
-    slotEl.id = `slot-dom-${idx}`;
+    slotEl.id = `slot-${panelId}-${idx}`;
+    slotEl.dataset.spellId = spellId;
+    slotEl.dataset.panelId = panelId;
+    slotEl.dataset.index = idx;
+    slotEl.draggable = isCDMEditMode;
 
-    if (!isEditMode) {
-      slotEl.onclick = () => triggerCast(slot.key);
-    }
+    const bindKey = customKeybinds[spellId] || spell.defaultKey;
 
     slotEl.innerHTML = `
-      <span class="keybind">${slot.key}</span>
-      <span class="spell-name" id="name-dom-${idx}">${spell.name}</span>
+      <img src="${spell.icon}" class="slot-icon-img" id="icon-${panelId}-${idx}" data-spell="${effId}">
+      <span class="keybind" id="bind-badge-${panelId}-${idx}">${bindKey}</span>
       ${spell.rageCost > 0 ? `<span class="cost">${spell.rageCost}</span>` : ""}
-      <span class="charges" id="charge-dom-${idx}"></span>
-      <div class="radial-cd-overlay" id="radial-dom-${idx}"></div>
-      <div class="cd-number" id="num-dom-${idx}"></div>
-      ${isEditMode ? `
-        <div class="slot-edit-tools">
-          <button onclick="openEditSlotModal(${idx})">${currentLang === "en" ? "Edit" : "Editar"}</button>
-          <div style="display: flex; gap: 2px;">
-            <button onclick="moveSlot(${idx}, -1)">◀</button>
-            <button onclick="moveSlot(${idx}, 1)">▶</button>
-            <button onclick="removeSlot(${idx})" style="background:#991b1b;">✕</button>
-          </div>
-        </div>
-      ` : ""}
+      <span class="charges" id="charge-${panelId}-${idx}"></span>
+      <button class="slot-gear-btn" title="Rebind Key" onclick="event.stopPropagation(); openRebindModalForSpell('${spellId}')">⚙</button>
+      <div class="radial-cd-overlay" id="radial-${panelId}-${idx}"></div>
+      <div class="cd-number" id="num-${panelId}-${idx}"></div>
     `;
+
+    slotEl.onclick = (e) => {
+      if (isCDMEditMode) return;
+      e.stopPropagation();
+      let curId = spellId;
+      if (spellId === "SLAM" && state.auras.heroicStrike) curId = "HS";
+      const sp = SPELL_DB[curId];
+      if (sp) handleIncomingCast(sp);
+    };
+
+    slotEl.oncontextmenu = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      openRebindModalForSpell(spellId);
+    };
+
+    slotEl.addEventListener("dragstart", (e) => {
+      if (!isCDMEditMode) return;
+      draggedSlotData = { spellId, sourcePanel: panelId, index: idx };
+      e.dataTransfer.setData("text/plain", JSON.stringify(draggedSlotData));
+      e.stopPropagation();
+    });
+
     container.appendChild(slotEl);
   });
 }
 
-function resetCombat() {
-  state.targetCount = parseInt(document.getElementById("target-count-select").value) || 1;
-  state.targetHP = parseInt(document.getElementById("dummy-hp").value) || 100;
-  state.rage = 40;
-  state.gcdRemaining = 0;
-  state.gcdBecameReadyAt = performance.now();
-  state.swingTimer = state.swingTotal;
-  state.channeling = null;
-  state.queuedSpell = null;
-  state.cds = { CS: 0, MS: 0, CLEAVE: 0, BS: 0, SS: 0, AVATAR: 0 };
-  state.opCharges = 2;
-  state.opRecharge = 0;
-  state.auras = { 
-    colossusSmash: 0, 
-    rendDot: 0, 
-    avatar: 0, 
-    overpowerBuff: 0, 
-    imminentDemise: 0, 
-    executionersPrecision: 0, 
-    sweepingStrikesCharges: 0,
-    sweepingStrikesTimer: 0,
-    suddenDeath: false, 
-    heroicStrike: false 
-  };
-  state.score = 0;
-  state.combo = 0;
-  state.totalCasts = 0;
-  state.perfectCasts = 0;
-  state.combatActive = false;
-  state.combatPaused = false;
-  state.combatTime = 0;
-  state.rageCapTime = 0;
-  state.rendUptimeAccum = 0;
-  state.gcdIdleAccum = 0;
-  state.successfulCasts = 0;
-  
-  state.wastedProcsCount = 0;
-  state.msHeldTime = 0;
-  state.rendDownTime = 0;
-  state.wastedPrecisionStacks = 0;
-  state.mistakeOccurrences = {};
-  state.totalMistakes = 0;
-  state.allCastLogs = [];
-  state.activeTimelineFilter = null;
+function setupCDMDragAndDrop() {
+  const containers = document.querySelectorAll(".cdm-slot-container");
+  containers.forEach(cont => {
+    cont.addEventListener("dragover", (e) => {
+      if (!isCDMEditMode || !draggedSlotData) return;
+      e.preventDefault();
+      cont.classList.add("drag-over");
+    });
+    cont.addEventListener("dragleave", () => cont.classList.remove("drag-over"));
+    cont.addEventListener("drop", (e) => {
+      if (!isCDMEditMode || !draggedSlotData) return;
+      e.preventDefault();
+      cont.classList.remove("drag-over");
 
-  const btnPause = document.getElementById("btn-pause-toggle");
-  btnPause.innerText = t("btnPause");
-  btnPause.classList.remove("btn-active");
+      const targetPanel = cont.dataset.panel;
+      const { spellId, sourcePanel, index: sourceIndex } = draggedSlotData;
 
-  updateTargetScenarioText();
-  document.getElementById("combat-clock").innerText = "00:00";
-  document.getElementById("log-container").innerHTML = "";
-  document.getElementById("channel-wrapper").style.display = "none";
-  document.getElementById("filter-wrapper").style.display = "none";
-  updateStatsUI();
-  updateAnalyzerUI();
-  updateScoreUI(0, 0, "-");
-  renderMostCommonProblems();
-  updateHUD(t("hudPromptStart"), "#94a3b8");
+      currentLayout[sourcePanel].slots.splice(sourceIndex, 1);
+
+      const targetSlot = e.target.closest(".action-slot");
+      if (targetSlot && targetSlot.dataset.panelId === targetPanel) {
+        const dropIndex = parseInt(targetSlot.dataset.index);
+        currentLayout[targetPanel].slots.splice(dropIndex, 0, spellId);
+      } else {
+        currentLayout[targetPanel].slots.push(spellId);
+      }
+
+      draggedSlotData = null;
+      renderAllCDMPanels();
+      saveCDMToStorage();
+    });
+  });
+
+  const frames = document.querySelectorAll(".cdm-frame");
+  frames.forEach(frame => {
+    frame.addEventListener("mousedown", (e) => {
+      if (!isCDMEditMode || e.button !== 0) return;
+      if (e.target.closest(".action-slot") && !e.target.closest(".cdm-drag-handle")) return;
+
+      e.stopPropagation();
+      selectFrame(frame.dataset.id);
+      activeDragFrame = frame;
+      frame.classList.add("is-dragging");
+
+      const rect = frame.getBoundingClientRect();
+      dragOffset.x = e.clientX - rect.left;
+      dragOffset.y = e.clientY - rect.top;
+    });
+  });
+
+  window.addEventListener("mousemove", (e) => {
+    if (!activeDragFrame || !isCDMEditMode) return;
+    const stage = document.getElementById("game-window");
+    if (!stage) return;
+    const stageRect = stage.getBoundingClientRect();
+
+    let targetX = e.clientX - stageRect.left - dragOffset.x;
+    let targetY = e.clientY - stageRect.top - dragOffset.y;
+
+    targetX = Math.round(targetX / 10) * 10;
+    targetY = Math.round(targetY / 10) * 10;
+
+    targetX = Math.max(10, Math.min(stageRect.width - 70, targetX));
+    targetY = Math.max(30, Math.min(stageRect.height - 60, targetY));
+
+    const fId = activeDragFrame.dataset.id;
+    currentLayout[fId].x = targetX;
+    currentLayout[fId].y = targetY;
+
+    activeDragFrame.style.left = targetX + "px";
+    activeDragFrame.style.top = targetY + "px";
+
+    updateInspectorPosition();
+  });
+
+  window.addEventListener("mouseup", () => {
+    if (activeDragFrame) {
+      activeDragFrame.classList.remove("is-dragging");
+      activeDragFrame = null;
+      saveCDMToStorage();
+    }
+  });
+
+  const gameWin = document.getElementById("game-window");
+  if (gameWin) {
+    gameWin.addEventListener("mousedown", (e) => {
+      if (e.target.id === "game-window" || e.target.tagName === "CANVAS") deselectFrame();
+    });
+  }
+}
+
+function selectFrame(frameId) {
+  selectedFrameId = frameId;
+  document.querySelectorAll(".cdm-frame").forEach(f => f.classList.toggle("cdm-selected", f.dataset.id === frameId));
+
+  const fData = currentLayout[frameId];
+  if (!fData) return;
+
+  const inspector = document.getElementById("cdm-inspector");
+  setText("insp-frame-name", frameId);
+  const scInput = document.getElementById("insp-scale");
+  if (scInput) scInput.value = fData.scale;
+  setText("insp-scale-txt", Math.round(fData.scale * 100) + "%");
+  const visInput = document.getElementById("insp-visible");
+  if (visInput) visInput.checked = fData.visible;
+  const orientInput = document.getElementById("insp-orientation");
+  if (orientInput) orientInput.value = fData.orientation || "horizontal";
+
+  if (inspector) inspector.style.display = "flex";
+  updateInspectorPosition();
+}
+
+function deselectFrame() {
+  selectedFrameId = null;
+  document.querySelectorAll(".cdm-frame").forEach(f => f.classList.remove("cdm-selected"));
+  const inspector = document.getElementById("cdm-inspector");
+  if (inspector) inspector.style.display = "none";
+}
+
+function updateInspectorPosition() {
+  if (!selectedFrameId) return;
+  const frameEl = document.querySelector(`.cdm-frame[data-id="${selectedFrameId}"]`);
+  if (!frameEl) return;
+
+  const rect = frameEl.getBoundingClientRect();
+  const inspector = document.getElementById("cdm-inspector");
+  if (!inspector) return;
+
+  let inspX = rect.right + 10;
+  let inspY = rect.top;
+
+  if (inspX + 250 > window.innerWidth) inspX = rect.left - 250;
+  inspector.style.left = Math.max(10, inspX) + "px";
+  inspector.style.top = Math.max(50, inspY) + "px";
+}
+
+function onOrientationChange(val) {
+  if (!selectedFrameId) return;
+  currentLayout[selectedFrameId].orientation = val;
+  applyFrameTransform(selectedFrameId);
+  updateInspectorPosition();
+  saveCDMToStorage();
+}
+
+function onScaleChange(val) {
+  if (!selectedFrameId) return;
+  currentLayout[selectedFrameId].scale = parseFloat(val);
+  setText("insp-scale-txt", Math.round(currentLayout[selectedFrameId].scale * 100) + "%");
+  applyFrameTransform(selectedFrameId);
+}
+
+function onVisibilityChange(checked) {
+  if (!selectedFrameId) return;
+  currentLayout[selectedFrameId].visible = checked;
+  applyFrameTransform(selectedFrameId);
+}
+
+function centerSelectedFrame() {
+  if (!selectedFrameId) return;
+  const windowRect = document.getElementById("game-window").getBoundingClientRect();
+  const frameEl = document.querySelector(`.cdm-frame[data-id="${selectedFrameId}"]`);
+  if (!frameEl) return;
+  const rect = frameEl.getBoundingClientRect();
+  const centerX = Math.round((windowRect.width - rect.width) / 2);
+  currentLayout[selectedFrameId].x = centerX;
+  frameEl.style.left = centerX + "px";
+  updateInspectorPosition();
+  saveCDMToStorage();
+}
+
+function resetSelectedFrame() {
+  if (!selectedFrameId || !DEFAULT_CDM_LAYOUT[selectedFrameId]) return;
+  currentLayout[selectedFrameId] = JSON.parse(JSON.stringify(DEFAULT_CDM_LAYOUT[selectedFrameId]));
+  applyCurrentLayoutToDOM();
+  renderAllCDMPanels();
+  selectFrame(selectedFrameId);
+  saveCDMToStorage();
+}
+
+function applyFrameTransform(frameId) {
+  const fData = currentLayout[frameId];
+  const el = document.querySelector(`.cdm-frame[data-id="${frameId}"]`);
+  if (!el || !fData) return;
+
+  el.style.left = fData.x + "px";
+  el.style.top = fData.y + "px";
+  el.style.transform = `scale(${fData.scale})`;
+  el.style.display = fData.visible ? "flex" : "none";
+
+  const orient = fData.orientation || "horizontal";
+  if (frameId === "resource") {
+    const rBar = document.getElementById("resource-bar-dom");
+    if (rBar) {
+      rBar.classList.remove("orientation-horizontal", "orientation-vertical");
+      rBar.classList.add(`orientation-${orient}`);
+    }
+  }
+
+  const container = el.querySelector(".cdm-slot-container, .auras-flex");
+  if (container) {
+    container.classList.remove("orientation-horizontal", "orientation-vertical");
+    container.classList.add(`orientation-${orient}`);
+  }
+}
+
+function applyCurrentLayoutToDOM() {
+  for (let fId in currentLayout) applyFrameTransform(fId);
+}
+
+function saveCDMToStorage() {
+  localStorage.setItem("wow_arms_slayer_cdm_layout_v6", JSON.stringify(currentLayout));
+}
+
+function loadStoredCDM() {
+  const st = localStorage.getItem("wow_arms_slayer_cdm_layout_v6");
+  if (st) {
+    try {
+      const parsed = JSON.parse(st);
+      for (let k in DEFAULT_CDM_LAYOUT) {
+        currentLayout[k] = Object.assign({}, DEFAULT_CDM_LAYOUT[k], parsed[k]);
+        if (DEFAULT_CDM_LAYOUT[k].slots && (!parsed[k] || !parsed[k].slots || parsed[k].slots.length === 0)) {
+          currentLayout[k].slots = [...DEFAULT_CDM_LAYOUT[k].slots];
+        }
+      }
+    } catch (e) {
+      currentLayout = JSON.parse(JSON.stringify(DEFAULT_CDM_LAYOUT));
+    }
+  }
+  const kb = localStorage.getItem("wow_arms_slayer_keybinds_v6");
+  if (kb) {
+    try { customKeybinds = Object.assign({}, customKeybinds, JSON.parse(kb)); } catch (e) {}
+  }
+}
+
+function saveKeybindsToStorage() {
+  localStorage.setItem("wow_arms_slayer_keybinds_v6", JSON.stringify(customKeybinds));
+}
+
+function openExportModal() {
+  const io = document.getElementById("layout-string-io");
+  if (io) io.value = btoa(JSON.stringify(currentLayout));
+  const m = document.getElementById("export-modal");
+  if (m) m.style.display = "flex";
+}
+function closeExportModal() {
+  const m = document.getElementById("export-modal");
+  if (m) m.style.display = "none";
+}
+function importLayoutFromIO() {
+  const io = document.getElementById("layout-string-io");
+  if (!io) return;
+  try {
+    const decoded = JSON.parse(atob(io.value.trim()));
+    currentLayout = Object.assign({}, DEFAULT_CDM_LAYOUT, decoded);
+    applyCurrentLayoutToDOM();
+    renderAllCDMPanels();
+    saveCDMToStorage();
+    closeExportModal();
+  } catch (err) { alert("Invalid layout string."); }
 }
 
 // ==========================================
-// 6. EVALUADOR APL SLAYER (SIMC V12.1.0)
+// 3. REBIND MODAL LOGIC
 // ==========================================
-function evaluateAPL() {
+let currentRebindSpellId = "CS";
+
+function openRebindModalForSpell(spellId) {
+  currentRebindSpellId = spellId || "CS";
+  const select = document.getElementById("rebind-spell-select");
+  if (!select) return;
+  select.innerHTML = "";
+
+  for (let key in SPELL_DB) {
+    if (key === "HS") continue;
+    const opt = document.createElement("option");
+    opt.value = key;
+    opt.innerText = `${SPELL_DB[key].name} (${customKeybinds[key] || SPELL_DB[key].defaultKey})`;
+    if (key === currentRebindSpellId) opt.selected = true;
+    select.appendChild(opt);
+  }
+
+  const keyInput = document.getElementById("rebind-key-input");
+  if (keyInput) {
+    keyInput.value = customKeybinds[currentRebindSpellId] || SPELL_DB[currentRebindSpellId].defaultKey;
+    keyInput.onkeydown = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const combo = parseEventToBindString(e);
+      if (combo && !combo.endsWith("+")) keyInput.value = combo;
+    };
+    keyInput.onmousedown = (e) => {
+      if (e.button >= 1) {
+        e.preventDefault();
+        e.stopPropagation();
+        const parts = [];
+        if (e.ctrlKey) parts.push("Ctrl");
+        if (e.altKey) parts.push("Alt");
+        if (e.shiftKey) parts.push("Shift");
+        const mName = e.button === 1 ? "M3" : e.button === 2 ? "M2" : e.button === 3 ? "M4" : e.button === 4 ? "M5" : `M${e.button+1}`;
+        parts.push(mName);
+        keyInput.value = parts.join("+");
+      }
+    };
+  }
+
+  const m = document.getElementById("rebind-modal");
+  if (m) m.style.display = "flex";
+}
+
+function onRebindSpellSelectChange(spellId) {
+  currentRebindSpellId = spellId;
+  const keyInput = document.getElementById("rebind-key-input");
+  if (keyInput) keyInput.value = customKeybinds[currentRebindSpellId] || SPELL_DB[currentRebindSpellId].defaultKey;
+}
+
+function restoreDefaultKeybindForSelected() {
+  if (!SPELL_DB[currentRebindSpellId]) return;
+  const keyInput = document.getElementById("rebind-key-input");
+  if (keyInput) keyInput.value = SPELL_DB[currentRebindSpellId].defaultKey;
+}
+
+function saveRebindModal() {
+  const keyInput = document.getElementById("rebind-key-input");
+  const newKey = (keyInput && keyInput.value.trim()) || "?";
+  customKeybinds[currentRebindSpellId] = newKey;
+  if (currentRebindSpellId === "SLAM") customKeybinds["HS"] = newKey;
+  saveKeybindsToStorage();
+  closeRebindModal();
+  renderAllCDMPanels();
+  updateHUD(`Keybind saved for ${SPELL_DB[currentRebindSpellId].name}: [${newKey}]`, "var(--perfect)");
+}
+
+function closeRebindModal() {
+  const m = document.getElementById("rebind-modal");
+  if (m) m.style.display = "none";
+}
+
+// ==========================================
+// 4. ROTATION LOGIC, TACTICIAN & RAGE ENGINE
+// ==========================================
+function getSpellCDMax(spellId) {
+  const spell = SPELL_DB[spellId];
+  if (!spell) return 0;
+  let haste = state.stats.haste;
+  if (state.activeTalents.has("in_for_the_kill") && state.auras.colossusSmash > 0) haste += 10.0;
+  return spell.scalesWithHaste ? spell.cdBase / (1 + haste / 100) : spell.cdBase;
+}
+
+function recalculateDerivedStats() {
+  let haste = state.stats.haste;
+  if (state.activeTalents.has("in_for_the_kill") && state.auras.colossusSmash > 0) haste += 10.0;
+  const factor = 1 + (haste / 100);
+  state.gcdTotal = Math.max(0.75, 1.5 / factor);
+  state.swingTotal = 2.86 / factor;
+  if (!state.combatActive) state.swingTimer = state.swingTotal;
+}
+
+function evaluateAPL(ignoreRecentProcs = false) {
   if (state.channeling) return null;
-
+  const now = performance.now();
   const enemies = state.targetCount;
-  const hasMassacre = state.activeTalents.has("massacre");
-  const hasBloodletting = state.activeTalents.has("bloodletting");
-  const hasSuddenDeath = state.activeTalents.has("sudden_death");
-  const hasFervor = state.activeTalents.has("fervor_of_battle") && enemies >= 2;
-  const isExecutePhase = (hasMassacre && state.targetHP <= 35) || state.targetHP <= 20;
+  const isExecute = state.targetHP <= 20;
+  let sd = state.auras.suddenDeath;
+  let hs = state.auras.heroicStrike;
 
-  // 1. actions.slayer_aoe (active_enemies >= 3 and not execute)[cite: 1]
-  if (enemies >= 3 && !isExecutePhase) {
+  if (ignoreRecentProcs) {
+    if (state.procTimestamps.suddenDeath > 0 && (now - state.procTimestamps.suddenDeath) < (state.procGraceWindow * 1000)) sd = Math.max(0, sd - 1);
+    if (state.procTimestamps.heroicStrike > 0 && (now - state.procTimestamps.heroicStrike) < (state.procGraceWindow * 1000)) hs = false;
+  }
+
+  if (enemies >= 3 && !isExecute) {
     if (state.auras.rendDot <= 0 && state.cds.CLEAVE <= 0 && state.rage >= SPELL_DB.CLEAVE.rageCost) return "CLEAVE";
     if (state.cds.SS <= 0 && state.auras.sweepingStrikesCharges <= 0) return "SS";
     if (state.cds.AVATAR <= 0) return "AVATAR";
-    if (state.auras.suddenDeath && state.cds.CS < 2) return "EXECUTE";
+    if (sd >= 2 && state.cds.CS < 2) return "EXECUTE";
     if (state.cds.CS <= 0) return "CS";
     if (state.cds.BS <= 0) return "BS";
     if (state.cds.CLEAVE <= 0 && state.rage >= SPELL_DB.CLEAVE.rageCost) return "CLEAVE";
-    if (state.opCharges === 2 && state.activeTalents.has("dreadnaught")) return "OP";
-    if (state.auras.suddenDeath && hasSuddenDeath) return "EXECUTE";
-    if (state.opCharges > 0 && state.activeTalents.has("dreadnaught")) return "OP";
-    if (state.rage >= 20 && isExecutePhase) return "EXECUTE";
+    if (state.opCharges === 2) return "OP";
+    if (sd >= 2) return "EXECUTE";
+    if (state.opCharges > 0) return "OP";
+    if (sd > 0) return "EXECUTE";
     if (state.cds.MS <= 0 && state.rage >= SPELL_DB.MS.rageCost) return "MS";
-    if (!hasFervor && state.rage >= 40) return "SLAM";
-  }
-  // 2. actions.slayer_execute[cite: 1]
-  else if (isExecutePhase) {
+  } else if (isExecute) {
     if (enemies >= 2 && state.cds.SS <= 0 && state.auras.sweepingStrikesCharges <= 0) return "SS";
-    if (!hasBloodletting && state.auras.rendDot < 2 && state.cds.CLEAVE <= 0 && state.rage >= SPELL_DB.CLEAVE.rageCost) return "CLEAVE";
+    if (state.auras.rendDot < 2 && state.cds.CLEAVE <= 0 && state.rage >= SPELL_DB.CLEAVE.rageCost) return "CLEAVE";
     if ((state.auras.colossusSmash > 0 || (state.cds.CS < 10 && state.cds.CS > state.gcdTotal)) && state.cds.AVATAR <= 0) return "AVATAR";
     if (state.cds.CS <= 0) return "CS";
-    if (!hasFervor && state.auras.heroicStrike && state.rage >= SPELL_DB.HS.rageCost) return "HS";
+    if (hs && state.rage >= SPELL_DB.HS.rageCost) return "HS";
     if ((state.auras.colossusSmash > 0 || state.auras.avatar > 0 || state.cds.CS > 25 || state.auras.executionersPrecision === 2) && state.cds.BS <= 0) return "BS";
     if (state.auras.executionersPrecision === 2 && state.cds.MS <= 0 && state.rage >= SPELL_DB.MS.rageCost) return "MS";
-    if (state.auras.suddenDeath && hasSuddenDeath) return "EXECUTE";
+    if (sd > 0) return "EXECUTE";
     if (state.rage > 40) return "EXECUTE";
     if (state.opCharges > 0) return "OP";
     if (state.rage >= 20) return "EXECUTE";
-  }
-  // 3. actions.slayer_st[cite: 1]
-  else {
+  } else {
     if (enemies === 2 && state.cds.SS <= 0 && state.auras.sweepingStrikesCharges <= 0) return "SS";
     if (state.auras.rendDot <= state.gcdTotal && state.cds.CLEAVE <= 0 && state.rage >= SPELL_DB.CLEAVE.rageCost) return "CLEAVE";
     if (state.cds.CS < 2 && state.auras.rendDot <= 10 && state.cds.CLEAVE <= 0 && state.rage >= SPELL_DB.CLEAVE.rageCost) return "CLEAVE";
     if ((state.auras.colossusSmash > 0 || (state.cds.CS < 10 && state.cds.CS > state.gcdTotal)) && state.cds.AVATAR <= 0) return "AVATAR";
-    if (state.auras.suddenDeath && hasSuddenDeath && state.cds.CS > 0 && state.cds.CS <= state.gcdTotal) return "EXECUTE";
+    if (sd >= 2 && state.cds.CS > 0 && state.cds.CS <= state.gcdTotal) return "EXECUTE";
     if (state.cds.CS <= 0) return "CS";
     if ((state.auras.colossusSmash > 0 || state.auras.avatar > 0 || state.cds.CS > 25) && state.cds.BS <= 0) return "BS";
-    if (!hasFervor && state.auras.heroicStrike && state.rage >= SPELL_DB.HS.rageCost) return "HS";
+    if (hs && state.rage >= SPELL_DB.HS.rageCost) return "HS";
     if (state.cds.MS <= 0 && state.rage >= SPELL_DB.MS.rageCost) return "MS";
-    if (state.auras.suddenDeath && hasSuddenDeath) return "EXECUTE";
+    if (sd >= 2) return "EXECUTE";
     if (state.opCharges > 0) return "OP";
+    if (sd > 0) return "EXECUTE";
     if (enemies === 2 && state.cds.CLEAVE <= 0 && state.rage >= SPELL_DB.CLEAVE.rageCost) return "CLEAVE";
     if (state.auras.rendDot <= 4.5 && state.cds.CLEAVE <= 0 && state.rage >= SPELL_DB.CLEAVE.rageCost) return "CLEAVE";
     if (state.rage >= 40) return "SLAM";
@@ -1467,160 +1699,85 @@ function evaluateAPL() {
   return null;
 }
 
-// ==========================================
-// 7. GESTOR DE ENTRADA CON TOLERANCIA DE SPAM
-// ==========================================
-function triggerCast(keyChar) {
-  if (isEditMode || state.combatPaused) return;
-  const slot = userSlots.find(s => s.key.toUpperCase() === keyChar.toUpperCase());
-  if (!slot) return;
-
-  let effectiveSpellId = slot.spellId;
-  if (slot.spellId === "SLAM" && state.auras.heroicStrike) {
-    effectiveSpellId = "HS";
-  }
-
-  const spell = SPELL_DB[effectiveSpellId];
-  if (!spell) return;
-
-  userSlots.forEach((s, idx) => {
-    if (s.key.toUpperCase() === keyChar.toUpperCase()) {
-      const el = document.getElementById(`slot-dom-${idx}`);
-      if (el) {
-        el.classList.add("pressed");
-        setTimeout(() => el.classList.remove("pressed"), 100);
-      }
-    }
-  });
-
-  setTimeout(() => {
-    handleIncomingCast(spell);
-  }, state.simulatedPing);
-}
-
 function handleIncomingCast(spell) {
   const now = new Date().toLocaleTimeString();
-
-  // CancelAura for Bladestorm
   if (state.channeling && state.channeling.name === "Bladestorm" && spell.id === "BS") {
     state.channeling = null;
     playAudioFeedback("good");
-    addLogEntry(now, "CancelAura: Bladestorm", "channel", currentLang === "en" ? "Channeling cancelled manually" : "Canalización interrumpida manualmente", { spell, status: "channel" });
-    updateHUD(currentLang === "en" ? "Bladestorm cancelled manually" : "Bladestorm cancelado manualmente", "var(--channel)");
+    addLogEntry(now, "CancelAura: Bladestorm", "channel", "Channeling cancelled manually", { spell, status: "channel" });
+    updateHUD("Bladestorm Cancelled", "var(--channel)");
     return;
   }
 
   const inLockout = (spell.triggersGCD && state.gcdRemaining > 0) || state.channeling !== null;
   const lockoutRemaining = state.channeling ? state.channeling.remaining : state.gcdRemaining;
-
-  // Inside Spell Queue Window (SQW)
+  
   if (inLockout && lockoutRemaining <= state.spellQueueWindow) {
     state.queuedSpell = { spell, queuedInSQW: true };
-    updateHUD(`[${t("auraQueue")}] ${spell.name} (${(lockoutRemaining * 1000).toFixed(0)}ms)`, "var(--queue)");
+    updateHUD(`[Queued] ${spell.name}`, "var(--queue)");
     return;
   }
-
-  // Outside SQW (Hard lockout)
-  if (inLockout && lockoutRemaining > state.spellQueueWindow) {
-    return;
-  }
+  if (inLockout && lockoutRemaining > state.spellQueueWindow) return;
 
   processSpellCast(spell, false);
 }
 
-function classifyMistake(castSpellId, idealSpellId) {
-  if (idealSpellId === "SS" && castSpellId !== "SS") return "SKIPPED_SWEEPING_STRIKES";
-  if (idealSpellId === "CLEAVE" && state.targetCount >= 3 && castSpellId !== "CLEAVE") return "SKIPPED_AOE_CLEAVE";
-  if (idealSpellId === "BS" && castSpellId !== "BS") return "DELAYED_BURST_CD";
-  if (idealSpellId === "HS" && castSpellId !== "HS") return "SKIPPED_HEROIC_STRIKE";
-  if (castSpellId === "EXECUTE" && state.auras.executionersPrecision === 2) return "OVERSTACKED_PRECISION";
-  if (castSpellId === "MS" && (state.targetHP <= 20 || (state.activeTalents.has("massacre") && state.targetHP <= 35)) && state.auras.executionersPrecision < 2) return "EARLY_MS_EXECUTE";
-  if (idealSpellId === "MS" && (castSpellId === "SLAM" || castSpellId === "CLEAVE")) return "DELAYED_MORTAL_STRIKE";
-  if (idealSpellId === "CLEAVE" && state.auras.rendDot <= 4.5) return "DROPPED_REND";
-  if ((idealSpellId === "CS" || idealSpellId === "AVATAR") && (castSpellId === "SLAM" || castSpellId === "OP")) return "DELAYED_BURST_CD";
-  if (state.auras.suddenDeath && castSpellId !== "EXECUTE") return "SKIPPED_SUDDEN_DEATH";
-  if (castSpellId === "SLAM" && idealSpellId !== "SLAM") return "UNNECESSARY_FILLER";
-  return "GENERAL_SUBOPTIMAL";
-}
-
 function processSpellCast(spell, fromQueue = false) {
   const now = new Date().toLocaleTimeString();
-
   if (!state.combatActive) {
-    state.combatActive = true;
-    state.combatPaused = false;
+    state.combatActive = true; state.combatPaused = false;
     state.gcdBecameReadyAt = performance.now();
-    addLogEntry(
-      now, 
-      currentLang === "en" ? "Combat Started" : "Inicio de Combate", 
-      "perfect", 
-      currentLang === "en" ? "Timers and Scoring Initialized" : "Cronómetro, Swing Timer y Puntuación iniciados", 
-      { spell, status: "perfect" }
-    );
+    addLogEntry(now, "Combat Started", "perfect", "APL Slayer Active", { spell, status: "perfect" });
   }
 
-  let reactionMs = 0;
-  let timingGrade = "PERFECT";
+  let reactionMs = fromQueue ? 0 : Math.max(0, Math.round(performance.now() - state.gcdBecameReadyAt));
+  let timingGrade = fromQueue || reactionMs <= 75 ? "PERFECT" : reactionMs <= 180 ? "GOOD" : "LATE";
 
-  if (fromQueue) {
-    reactionMs = 0;
-    timingGrade = "PERFECT";
-  } else {
-    reactionMs = Math.max(0, Math.round(performance.now() - state.gcdBecameReadyAt));
-    if (reactionMs <= 75) timingGrade = "PERFECT";
-    else if (reactionMs <= 180) timingGrade = "GOOD";
-    else timingGrade = "LATE";
-  }
+  const outOfRange = state.enforceRange && spell.id !== "AVATAR" && !state.inMeleeRange;
+  let idealId = evaluateAPL(false);
+  if (idealId !== spell.id && evaluateAPL(true) === spell.id) idealId = spell.id;
 
-  const idealSpellId = evaluateAPL();
   const inCD = spell.id === "OP" ? state.opCharges === 0 : (state.cds[spell.id] && state.cds[spell.id] > 0);
-  const noRage = !state.auras.suddenDeath && state.rage < spell.rageCost;
-  const isExecuteThreshold = (state.activeTalents.has("massacre") && state.targetHP <= 35) || state.targetHP <= 20;
-  const invalidExecute = spell.id === "EXECUTE" && !isExecuteThreshold && !state.auras.suddenDeath;
+  let effectiveCost = spell.rageCost;
+  if (spell.id === "MS" && state.battlelordCostReduction) effectiveCost = Math.max(0, effectiveCost - 10);
+  const noRage = (spell.id === "EXECUTE" && state.auras.suddenDeath > 0) ? false : (state.rage < effectiveCost);
+  const invalidExecute = spell.id === "EXECUTE" && state.targetHP > 20 && state.auras.suddenDeath === 0;
 
-  let status = "perfect";
-  let message = "";
-  let errorType = null;
-
-  if (inCD) {
-    status = "error";
-    message = currentLang === "en" ? `Failed: ${spell.name} on Cooldown` : `Falló: ${spell.name} en Cooldown`;
-    errorType = "GENERAL_SUBOPTIMAL";
+  let status = "perfect", message = "", errorType = null;
+  if (outOfRange) {
+    status = "error"; message = t("outOfRangeMsg"); errorType = "OUT_OF_RANGE";
+  } else if (inCD) {
+    status = "error"; message = `${spell.name} ${t("failedCD")}`; errorType = "GENERAL_SUBOPTIMAL";
   } else if (noRage) {
-    status = "error";
-    message = currentLang === "en" ? `Failed: Insufficient Rage (${Math.round(state.rage)}/${spell.rageCost})` : `Falló: Furia insuficiente (${Math.round(state.rage)}/${spell.rageCost})`;
-    errorType = "UNNECESSARY_FILLER";
+    status = "error"; message = `${t("failedRage")} (${Math.round(state.rage)}/${effectiveCost})`; errorType = "GENERAL_SUBOPTIMAL";
   } else if (invalidExecute) {
-    status = "error";
-    message = currentLang === "en" ? `Failed: Target above Execute range` : `Falló: Objetivo fuera de rango de Execute`;
+    status = "error"; message = t("failedExec"); errorType = "GENERAL_SUBOPTIMAL";
+  } else if (spell.id !== idealId) {
+    status = "suboptimal"; message = `${t("suboptimalMsg")} [${idealId ? SPELL_DB[idealId].name : 'Wait'}]`;
     errorType = "GENERAL_SUBOPTIMAL";
-  } else if (spell.id !== idealSpellId) {
-    status = "suboptimal";
-    const idealName = idealSpellId ? SPELL_DB[idealSpellId].name : (currentLang === "en" ? "Wait resource" : "Esperar recurso");
-    message = currentLang === "en" ? `Suboptimal: APL demanded [${idealName}]` : `Subóptimo: APL pedía [${idealName}]`;
-    errorType = classifyMistake(spell.id, idealSpellId);
   } else {
-    status = "perfect";
-    message = currentLang === "en" ? `¡${timingGrade}! Optimal APL sequence (${reactionMs}ms)` : `¡${timingGrade}! Secuencia APL óptima (${reactionMs}ms)`;
+    status = "perfect"; message = `¡${timingGrade}! ${t("optimalSeq")} (${reactionMs}ms)`;
   }
+
+  addRecentResultTicker(spell.name, status === "perfect" ? timingGrade.toLowerCase() : status, reactionMs);
+  updateHUD(message, status === "perfect" ? "var(--perfect)" : status === "suboptimal" ? "var(--suboptimal)" : "var(--error)");
 
   if (status === "perfect") {
     state.combo++;
     state.maxCombo = Math.max(state.maxCombo, state.combo);
     const multiplier = 1 + Math.floor(state.combo / 5) * 0.5;
-    const basePoints = timingGrade === "PERFECT" ? 100 : timingGrade === "GOOD" ? 65 : 35;
-    const addedScore = Math.round(basePoints * multiplier);
-    state.score += addedScore;
-
+    const basePts = timingGrade === "PERFECT" ? 100 : timingGrade === "GOOD" ? 65 : 35;
+    const pts = Math.round(basePts * multiplier);
+    state.score += pts;
     playAudioFeedback(timingGrade.toLowerCase());
-    triggerFCT(`+${addedScore} ${timingGrade}`, timingGrade === "PERFECT" ? "#22c55e" : timingGrade === "GOOD" ? "#38bdf8" : "#f59e0b");
+    triggerFCT(`+${pts} ${timingGrade}`, timingGrade === "PERFECT" ? "#22c55e" : "#38bdf8");
+    spawn3DImpactFX(timingGrade === "PERFECT" ? 0x22c55e : 0x38bdf8);
     updateScoreUI(state.score, state.combo, `${reactionMs}ms (${timingGrade})`);
   } else {
     state.combo = 0;
     playAudioFeedback("error");
-    triggerFCT(status === "suboptimal" ? (currentLang === "en" ? "SUBOPTIMAL" : "SUBÓPTIMO") : "MISS", "#ef4444");
+    triggerFCT(errorType === "OUT_OF_RANGE" ? "OUT OF RANGE" : "MISS", "#ef4444");
     updateScoreUI(state.score, 0, status.toUpperCase());
-
     if (errorType) {
       state.totalMistakes++;
       state.mistakeOccurrences[errorType] = (state.mistakeOccurrences[errorType] || 0) + 1;
@@ -1628,86 +1785,102 @@ function processSpellCast(spell, fromQueue = false) {
   }
 
   if (status !== "error") {
-    let spent = spell.rageCost;
-    if (spell.id === "EXECUTE" && state.auras.suddenDeath) spent = 0;
-
+    let spent = (spell.id === "EXECUTE" && state.auras.suddenDeath > 0) ? 0 : effectiveCost;
     state.rage = Math.min(100, Math.max(0, state.rage - spent + spell.rageGen));
     state.successfulCasts++;
 
     if (spent > 0) {
-      dispatchTalentHook("onRageSpent", spent, state, (title, type, desc) => addLogEntry(now, title, type, desc));
+      if (state.activeTalents.has("frothing_berserker")) {
+        state.rage = Math.min(100, state.rage + (spent * 0.10));
+      }
+
+      if (state.activeTalents.has("anger_management")) {
+        const cdr = (spent / 20) * 1.0;
+        if (state.cds.CS > 0) state.cds.CS = Math.max(0, state.cds.CS - cdr);
+        if (state.cds.AVATAR > 0) state.cds.AVATAR = Math.max(0, state.cds.AVATAR - cdr);
+        if (state.cds.BS > 0) state.cds.BS = Math.max(0, state.cds.BS - cdr);
+      }
+
+      if (state.activeTalents.has("tactician")) {
+        const tactChance = spent * 0.014;
+        if (Math.random() < tactChance) {
+          if (state.opCharges < 2) {
+            state.opCharges++;
+            state.opRecharge = state.opCharges < 2 ? getSpellCDMax("OP") : 0;
+            playAudioFeedback("proc");
+            triggerFCT("¡TACTICIAN!", "#38bdf8");
+            addLogEntry(now, "Tactician Proc", "perfect", "Overpower charge refunded by rage spent");
+          }
+        }
+      }
+    }
+
+    if (spell.id === "OP") {
+      state.opCharges--;
+      if (state.opCharges < 2 && state.opRecharge <= 0) state.opRecharge = getSpellCDMax("OP");
+
+      if (state.activeTalents.has("battlelord") && Math.random() < 0.35) {
+        state.cds.MS = 0;
+        state.battlelordCostReduction = true;
+        triggerFCT("¡BATTLELORD!", "#38bdf8");
+        playAudioFeedback("proc");
+        addLogEntry(now, "Battlelord Proc", "perfect", "Mortal Strike CD reset & -10 Rage cost");
+      }
+    }
+
+    if ((spell.id === "MS" || spell.id === "OP") && state.activeTalents.has("slayer_strike") && Math.random() < 0.40) {
+      state.auras.slayerDebuff = Math.min(3, state.auras.slayerDebuff + 1);
+      state.auras.slayerTimer = 12.0;
+      triggerFCT(`Slayer's Strike x${state.auras.slayerDebuff}`, "#c084fc");
     }
 
     if (spell.id === "EXECUTE") {
-      state.rage = Math.min(100, state.rage + 2.15);
-      state.auras.imminentDemise = Math.min(10, state.auras.imminentDemise + 1);
-      if (state.cds.BS > 0) {
-        state.cds.BS = Math.max(0, state.cds.BS - 3.5);
-        addLogEntry(now, "CDR: Bladestorm", "cdr", currentLang === "en" ? "-3.5s by Execute cast" : "-3.5s por lanzamiento de Execute");
+      if (state.auras.fatalityStacks > 0) {
+        triggerFCT(`Fatality (${state.auras.fatalityStacks * 12}k)`, "#f59e0b");
+        state.auras.fatalityStacks = 0;
       }
-    }
-
-    // Consumo de cargas de Sweeping Strikes (habilidades Single Target o Cleave con Fervor of Battle)
-    const consumesSS = ["MS", "OP", "EXECUTE", "SLAM", "HS"].includes(spell.id) || 
-                       (spell.id === "CLEAVE" && state.activeTalents.has("fervor_of_battle"));
-    if (consumesSS && state.auras.sweepingStrikesCharges > 0 && state.targetCount >= 2) {
-      state.auras.sweepingStrikesCharges--;
-      if (state.auras.sweepingStrikesCharges <= 0) {
-        state.auras.sweepingStrikesTimer = 0;
+      if (state.activeTalents.has("executioners_precision")) {
+        if (state.auras.executionersPrecision === 2) state.wastedPrecisionStacks++;
+        else state.auras.executionersPrecision = Math.min(2, state.auras.executionersPrecision + 1);
       }
+      if (state.cds.BS > 0) state.cds.BS = Math.max(0, state.cds.BS - 3.5);
+      if (state.auras.suddenDeath > 0) state.auras.suddenDeath--;
+    } else if (spell.id === "MS") {
+      state.battlelordCostReduction = false;
+      state.auras.executionersPrecision = 0;
     }
-
-    dispatchTalentHook("onSpellCast", spell, state, (title, type, desc) => addLogEntry(now, title, type, desc));
 
     if (spell.triggersGCD) state.gcdRemaining = state.gcdTotal;
 
     if (spell.id === "CS") {
       state.cds.CS = getSpellCDMax("CS");
       state.auras.colossusSmash = 10;
+      recalculateDerivedStats();
     } else if (spell.id === "MS") {
       state.cds.MS = getSpellCDMax("MS");
-      state.auras.overpowerBuff = 0;
-    } else if (spell.id === "OP") {
-      state.opCharges--;
-      if (state.opCharges < 2 && state.opRecharge <= 0) state.opRecharge = getSpellCDMax("OP");
-      state.auras.overpowerBuff = Math.min(2, state.auras.overpowerBuff + 1);
     } else if (spell.id === "CLEAVE") {
       state.cds.CLEAVE = getSpellCDMax("CLEAVE");
-      const baseRend = 15;
-      const pandemicThreshold = 4.5;
-      const rollover = Math.min(pandemicThreshold, Math.max(0, state.auras.rendDot));
-      state.auras.rendDot = baseRend + rollover;
+      const rollover = Math.min(4.5, Math.max(0, state.auras.rendDot));
+      state.auras.rendDot = 15 + rollover;
+      if (state.auras.heroicStrike) state.auras.heroicStrike = false;
     } else if (spell.id === "SS") {
       state.cds.SS = getSpellCDMax("SS");
-      const current = state.auras.sweepingStrikesCharges;
-      const toAdd = 12;
-      const newTotal = Math.min(18, current + toAdd);
-      const gained = newTotal - current;
-      state.auras.sweepingStrikesCharges = newTotal;
+      state.auras.sweepingStrikesCharges = Math.min(18, state.auras.sweepingStrikesCharges + 12);
       state.auras.sweepingStrikesTimer = 30.0;
-      triggerFCT(`+${gained} SS Charges`, "#e11d48");
-      addLogEntry(
-        now, 
-        "Sweeping Strikes", 
-        "perfect", 
-        currentLang === "en" ? `+${gained} charges gained (${newTotal}/18 max)` : `+${gained} cargas obtenidas (${newTotal}/18 máx)`
-      );
     } else if (spell.id === "BS") {
       state.cds.BS = getSpellCDMax("BS");
-      state.auras.imminentDemise = 0;
       state.channeling = {
         name: "Bladestorm",
         total: spell.channelDuration,
         remaining: spell.channelDuration,
-        unhingedCastsDone: 0
+        lastTickTime: spell.channelDuration,
+        unhingedDone: 0
       };
     } else if (spell.id === "AVATAR") {
       state.cds.AVATAR = getSpellCDMax("AVATAR");
       state.auras.avatar = 20;
     } else if (spell.id === "HS") {
       state.auras.heroicStrike = false;
-    } else if (spell.id === "EXECUTE") {
-      if (state.auras.suddenDeath) state.auras.suddenDeath = false;
     }
   }
 
@@ -1715,417 +1888,537 @@ function processSpellCast(spell, fromQueue = false) {
   if (status === "perfect") state.perfectCasts++;
 
   const auditData = {
-    spell: spell.name,
-    ideal: idealSpellId ? SPELL_DB[idealSpellId].name : (currentLang === "en" ? "None" : "Ninguno"),
-    timing: `${reactionMs}ms (${timingGrade})`,
-    errorType: errorType,
-    errorPattern: errorType ? getErrorTaxonomyTitle(errorType) : t("optimalSequence"),
-    rage: `${Math.round(state.rage)}/100`,
-    rend: `${state.auras.rendDot.toFixed(1)}s`,
-    precision: state.auras.executionersPrecision,
-    reason: errorType ? getErrorTaxonomyTip(errorType) : t("optimalDiagnosis")
+    spell: spell.name, ideal: idealId ? SPELL_DB[idealId].name : "None",
+    timing: `${reactionMs}ms (${timingGrade})`, errorType,
+    errorPattern: errorType ? errorType : t("optimalSeq"),
+    rage: `${Math.round(state.rage)}/100`, rend: `${state.auras.rendDot.toFixed(1)}s`,
+    precision: state.auras.executionersPrecision, reason: errorType ? message : t("optimalDiag")
   };
 
   addLogEntry(now, spell.name, status === "perfect" ? timingGrade.toLowerCase() : status, message, auditData);
-  updateHUD(message, status === "perfect" ? "var(--perfect)" : status === "suboptimal" ? "var(--suboptimal)" : "var(--error)");
   updateStatsUI();
-  renderMostCommonProblems();
+  renderAurasDashboard();
 }
 
-function updateHUD(text, color) {
-  const hud = document.getElementById("hud-feedback");
-  hud.innerText = text;
-  hud.style.color = color;
+window.addEventListener("keydown", (e) => {
+  if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT" || isCDMEditMode) return;
+  const k = (e.key || "").toLowerCase();
+  if (["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright"].includes(k) && !e.shiftKey && !e.ctrlKey && !e.altKey) return;
+  
+  const combo = parseEventToBindString(e);
+  if (!combo || combo.endsWith("+")) return;
+
+  for (let spId in customKeybinds) {
+    if (customKeybinds[spId].toLowerCase() === combo.toLowerCase()) {
+      let effId = spId;
+      if (spId === "SLAM" && state.auras.heroicStrike) effId = "HS";
+      const sp = SPELL_DB[effId];
+      if (sp) handleIncomingCast(sp);
+      break;
+    }
+  }
+});
+
+function parseEventToBindString(e) {
+  const parts = [];
+  if (e.ctrlKey) parts.push("Ctrl");
+  if (e.altKey) parts.push("Alt");
+  if (e.shiftKey) parts.push("Shift");
+  let k = e.code.replace("Digit", "").replace("Numpad", "").replace("Key", "");
+  if (["ShiftLeft", "ShiftRight", "ControlLeft", "ControlRight", "AltLeft", "AltRight"].includes(e.code)) return parts.join("+");
+  if (!parts.includes(k)) parts.push(k);
+  return parts.join("+");
+}
+
+function updateHUD(text, color = "#94a3b8") {
+  const el = document.getElementById("hud-feedback");
+  if (el) { el.innerText = text; el.style.color = color; }
+}
+
+function addRecentResultTicker(spellName, statusClass, ms) {
+  const container = document.getElementById("results-ticker-list");
+  if (!container) return;
+  const pill = document.createElement("div");
+  pill.className = `result-pill ${statusClass}`;
+  pill.innerText = `${spellName} (${ms}ms)`;
+  container.prepend(pill);
+  if (container.children.length > 6) container.removeChild(container.lastChild);
 }
 
 function updateScoreUI(score, combo, timingStr) {
-  document.getElementById("score-val").innerText = score;
+  setText("score-val", score);
   const mult = (1 + Math.floor(combo / 5) * 0.5).toFixed(1);
-  document.getElementById("combo-val").innerText = `x${combo} (${mult}x)`;
-  document.getElementById("timing-val").innerText = timingStr;
+  setText("combo-val", `x${combo} (${mult}x)`);
+  setText("timing-val", timingStr);
   const gradeEl = document.getElementById("grade-val");
-  if (combo > 15) { gradeEl.innerText = t("gradeGodlike"); gradeEl.style.color = "#ec4899"; }
-  else if (combo > 8) { gradeEl.innerText = t("gradeGreat"); gradeEl.style.color = "#22c55e"; }
-  else if (combo > 0) { gradeEl.innerText = t("gradeRhythm"); gradeEl.style.color = "#38bdf8"; }
-  else { gradeEl.innerText = t("gradeBroken"); gradeEl.style.color = "#ef4444"; }
+  if (gradeEl) {
+    if (combo > 15) { gradeEl.innerText = t("gradeGodlike"); gradeEl.style.color = "#ec4899"; }
+    else if (combo > 8) { gradeEl.innerText = t("gradeGreat"); gradeEl.style.color = "#22c55e"; }
+    else if (combo > 0) { gradeEl.innerText = t("gradeFlow"); gradeEl.style.color = "#38bdf8"; }
+    else { gradeEl.innerText = t("gradeBroken"); gradeEl.style.color = "#ef4444"; }
+  }
 }
 
 function addLogEntry(time, spellName, statusClass, reason, auditData = null) {
-  const logObj = { time, spellName, statusClass, reason, auditData };
-  state.allCastLogs.unshift(logObj);
+  state.allCastLogs.unshift({ time, spellName, statusClass, reason, auditData });
   renderTimelineView();
 }
 
 function renderTimelineView() {
   const container = document.getElementById("log-container");
+  if (!container) return;
   container.innerHTML = "";
-
-  const logsToDisplay = state.activeTimelineFilter 
-    ? state.allCastLogs.filter(l => l.auditData && l.auditData.errorType === state.activeTimelineFilter)
-    : state.allCastLogs;
-
-  logsToDisplay.slice(0, 80).forEach(log => {
-    const entry = document.createElement("div");
-    entry.className = `log-entry ${log.statusClass}`;
-    entry.innerHTML = `<span><strong>[${log.time}]</strong> ${log.spellName}</span><span>${log.reason} 🔍</span>`;
-    if (log.auditData) {
-      entry.onclick = () => openAuditModal(log.auditData);
-    }
-    container.appendChild(entry);
+  state.allCastLogs.slice(0, 45).forEach(log => {
+    const el = document.createElement("div");
+    el.className = `log-entry ${log.statusClass}`;
+    el.innerHTML = `<span><strong>[${log.time}]</strong> ${log.spellName}</span><span>${log.reason} 🔍</span>`;
+    if (log.auditData) el.onclick = () => openAuditModal(log.auditData);
+    container.appendChild(el);
   });
 }
 
-function filterTimelineByError(errorTypeId) {
-  state.activeTimelineFilter = errorTypeId;
-  document.getElementById("filter-wrapper").style.display = "flex";
-  document.getElementById("filter-label").innerText = `${t("filterActive")}: ${getErrorTaxonomyTitle(errorTypeId).substring(0, 30)}...`;
-  renderTimelineView();
-}
-
-function clearTimelineFilter() {
-  state.activeTimelineFilter = null;
-  document.getElementById("filter-wrapper").style.display = "none";
-  renderTimelineView();
-}
-
 function openAuditModal(data) {
-  document.getElementById("audit-spell").innerText = data.spell;
-  document.getElementById("audit-ideal").innerText = data.ideal;
-  document.getElementById("audit-timing").innerText = data.timing;
-  document.getElementById("audit-pattern").innerText = data.errorType ? getErrorTaxonomyTitle(data.errorType) : t("optimalSequence");
-  document.getElementById("audit-state").innerText = `${t("rageLabel")}: ${data.rage} | Rend: ${data.rend} | Precision x${data.precision} | SS: ${state.auras.sweepingStrikesCharges > 0 ? state.auras.sweepingStrikesCharges + ' charges' : 'None'}`;
-  document.getElementById("audit-reason").innerText = data.errorType ? getErrorTaxonomyTip(data.errorType) : t("optimalDiagnosis");
-  document.getElementById("audit-modal").style.display = "flex";
+  setText("audit-spell", data.spell);
+  setText("audit-ideal", data.ideal);
+  setText("audit-timing", data.timing);
+  setText("audit-pattern", data.errorPattern);
+  setText("audit-state", `Rage: ${data.rage} | Rend: ${data.rend} | Precision x${data.precision} | SD x${state.auras.suddenDeath}`);
+  setText("audit-reason", data.reason);
+  const m = document.getElementById("audit-modal");
+  if (m) m.style.display = "flex";
+}
+function closeAuditModal() {
+  const m = document.getElementById("audit-modal");
+  if (m) m.style.display = "none";
 }
 
-function closeAuditModal() {
-  document.getElementById("audit-modal").style.display = "none";
+function renderAurasDashboard() {
+  const targetRow = document.getElementById("container-targetAuras");
+  const playerRow = document.getElementById("container-playerAuras");
+  if (!targetRow || !playerRow) return;
+  targetRow.innerHTML = ""; playerRow.innerHTML = "";
+
+  if (state.auras.rendDot > 0) {
+    targetRow.innerHTML += `<div class="aura-icon-frame ${state.auras.rendDot <= 4.5 ? 'aura-border-pandemic' : ''}"><img src="${AURA_ICONS.rend}" class="aura-icon-img"><div class="aura-timer-overlay">${state.auras.rendDot.toFixed(1)}s</div></div>`;
+  }
+  if (state.auras.colossusSmash > 0) {
+    targetRow.innerHTML += `<div class="aura-icon-frame aura-border-proc"><img src="${AURA_ICONS.cs}" class="aura-icon-img"><div class="aura-timer-overlay">${state.auras.colossusSmash.toFixed(1)}s</div></div>`;
+  }
+  if (state.auras.slayerDebuff > 0) {
+    targetRow.innerHTML += `<div class="aura-icon-frame"><img src="${AURA_ICONS.slayer}" class="aura-icon-img"><div class="aura-stacks-badge">x${state.auras.slayerDebuff}</div></div>`;
+  }
+  if (state.auras.suddenDeath > 0) {
+    playerRow.innerHTML += `<div class="aura-icon-frame aura-border-proc"><img src="${AURA_ICONS.sd}" class="aura-icon-img"><div class="aura-stacks-badge">x${state.auras.suddenDeath}</div></div>`;
+  }
+  if (state.auras.heroicStrike) {
+    playerRow.innerHTML += `<div class="aura-icon-frame aura-border-blue"><img src="${AURA_ICONS.hs}" class="aura-icon-img"><div class="aura-timer-overlay" style="font-size:0.65rem; color:#38bdf8;">PROC</div></div>`;
+  }
+  if (state.auras.executionersPrecision > 0) {
+    playerRow.innerHTML += `<div class="aura-icon-frame ${state.auras.executionersPrecision === 2 ? 'aura-border-proc' : ''}"><img src="${AURA_ICONS.precision}" class="aura-icon-img"><div class="aura-stacks-badge">x${state.auras.executionersPrecision}</div></div>`;
+  }
+  if (state.auras.sweepingStrikesCharges > 0) {
+    playerRow.innerHTML += `<div class="aura-icon-frame aura-border-blue"><img src="${AURA_ICONS.ss}" class="aura-icon-img"><div class="aura-stacks-badge">${state.auras.sweepingStrikesCharges}</div></div>`;
+  }
 }
 
 function updateStatsUI() {
-  document.getElementById("total-casts").innerText = state.totalCasts;
-  const rate = state.totalCasts > 0 ? Math.round((state.perfectCasts / state.totalCasts) * 100) : 100;
-  document.getElementById("accuracy-rate").innerText = rate + "%";
+  if (state.combatTime > 0) {
+    setText("analyzer-apm", ((state.successfulCasts / state.combatTime) * 60).toFixed(1));
+    setText("analyzer-wasted-procs", state.wastedProcsCount);
+    setText("analyzer-ms-held", state.msHeldTime.toFixed(1) + "s");
+    setText("analyzer-rend-down", state.rendDownTime.toFixed(1) + "s");
+  }
 }
 
-function renderMostCommonProblems() {
-  const container = document.getElementById("problems-container");
-  if (state.totalMistakes === 0) {
-    if (state.totalCasts > 5) {
-      container.innerHTML = `<div style="color: #22c55e; font-weight: bold; text-align: center; padding: 10px;">${t("flawlessProblems")}</div>`;
-    } else {
-      container.innerHTML = `<div style="color: #64748b; font-style: italic; font-size: 0.8rem; text-align: center; padding: 12px;">${t("emptyProblems")}</div>`;
-    }
-    return;
-  }
-
-  const sortedErrors = Object.keys(state.mistakeOccurrences)
-    .sort((a, b) => state.mistakeOccurrences[b] - state.mistakeOccurrences[a]);
-
-  container.innerHTML = sortedErrors.map(errKey => {
-    const count = state.mistakeOccurrences[errKey];
-    const pct = Math.round((count / state.totalMistakes) * 100);
-    const title = getErrorTaxonomyTitle(errKey);
-
-    return `
-      <div class="problem-card">
-        <div class="problem-info">
-          <div class="problem-title">${title}</div>
-          <div class="problem-bar-wrapper">
-            <span>${pct}% ${t("ofMistakes")} (${count}x)</span>
-            <div class="problem-bar-bg">
-              <div class="problem-bar-fill" style="width: ${pct}%;"></div>
-            </div>
-          </div>
-        </div>
-        <button class="btn-show-me" onclick="filterTimelineByError('${errKey}')">${t("showMe")}</button>
-      </div>
+function renderTalentsGrid() {
+  const container = document.getElementById("talents-grid");
+  if (!container) return;
+  container.innerHTML = "";
+  for (let key in ARMS_TALENT_TREE) {
+    const tItem = ARMS_TALENT_TREE[key];
+    const isActive = state.activeTalents.has(tItem.id);
+    const node = document.createElement("div");
+    node.className = `talent-node ${isActive ? 'active' : ''}`;
+    node.onclick = () => {
+      if (state.activeTalents.has(tItem.id)) state.activeTalents.delete(tItem.id);
+      else state.activeTalents.add(tItem.id);
+      renderTalentsGrid();
+      recalculateDerivedStats();
+    };
+    const displayName = currentLang === "en" ? tItem.name_en : tItem.name_es;
+    const displayDesc = currentLang === "en" ? tItem.desc_en : tItem.desc_es;
+    node.innerHTML = `
+      <div class="talent-node-title"><span>${displayName}</span><span>${isActive ? "✓" : "+"}</span></div>
+      <div class="talent-node-desc">${displayDesc}</div>
     `;
-  }).join("");
+    container.appendChild(node);
+  }
 }
 
-function updateAnalyzerUI() {
-  const badge = document.getElementById("combat-status-badge");
-  if (!state.combatActive) {
-    badge.className = "stats-badge status-badge-idle";
-    badge.innerText = t("statusIdle");
-  } else if (state.combatPaused) {
-    badge.className = "stats-badge status-badge-paused";
-    badge.innerText = t("statusPaused");
-  } else {
-    badge.className = "stats-badge status-badge-combat";
-    badge.innerText = t("statusCombat");
+function triggerFCT(text, color = "#facc15") {
+  const layer = document.getElementById("fct-layer");
+  if (!layer) return;
+  const el = document.createElement("div");
+  el.className = "fct-text";
+  el.innerText = text; el.style.color = color;
+  el.style.left = `calc(50% + ${(Math.random() * 140 - 70)}px)`;
+  el.style.top = `calc(32% + ${(Math.random() * 40 - 20)}px)`;
+  layer.appendChild(el);
+  setTimeout(() => el.remove(), 850);
+}
+
+// Audio Synthesizer
+let audioCtx = null;
+function initAudio() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+}
+function playSynthesizedTone(freq, type, duration, gainVal = 0.08) {
+  if (!audioCtx) return;
+  try {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = type; osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+    gain.gain.setValueAtTime(gainVal, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    osc.start(); osc.stop(audioCtx.currentTime + duration);
+  } catch (e) {}
+}
+function playAudioFeedback(type) {
+  initAudio();
+  if (type === "perfect") {
+    playSynthesizedTone(880, "sine", 0.08, 0.09);
+    setTimeout(() => playSynthesizedTone(1320, "sine", 0.12, 0.08), 40);
+  } else if (type === "good") playSynthesizedTone(660, "sine", 0.1, 0.08);
+  else if (type === "error") playSynthesizedTone(130, "sawtooth", 0.18, 0.12);
+  else if (type === "proc") {
+    playSynthesizedTone(1046, "sine", 0.08, 0.08);
+    setTimeout(() => playSynthesizedTone(1318, "sine", 0.08, 0.08), 50);
+  }
+}
+
+// ==========================================
+// 5. GAME LOOP & RENDERING
+// ==========================================
+let lastTick = performance.now();
+
+function gameLoop(now) {
+  const currentTime = now || performance.now();
+  let dt = (currentTime - lastTick) / 1000;
+  lastTick = currentTime;
+  if (isNaN(dt) || dt <= 0 || dt > 0.1) dt = 0.016;
+
+  try {
+    updateArenaEntities(dt);
+  } catch (err) {
+    console.error("3D Arena update error:", err);
   }
 
-  if (state.combatTime <= 0) return;
+  try {
+    if (state.combatActive && !state.combatPaused) {
+      state.combatTime += dt;
+      if (state.rage >= 99.5) state.rageCapTime += dt;
+      if (state.auras.rendDot > 0) state.rendUptimeAccum += dt; else state.rendDownTime += dt;
+      if (state.cds.MS <= 0 && state.rage >= SPELL_DB.MS.rageCost && !state.channeling && state.targetHP > 20 && state.targetCount === 1) state.msHeldTime += dt;
+      if (state.gcdRemaining <= 0 && !state.channeling) state.gcdIdleAccum += dt;
 
-  const apm = ((state.successfulCasts / state.combatTime) * 60).toFixed(1);
-  document.getElementById("analyzer-apm").innerText = apm;
+      if (state.auras.slayerTimer > 0) { state.auras.slayerTimer -= dt; if (state.auras.slayerTimer <= 0) state.auras.slayerDebuff = 0; }
+      if (state.auras.sweepingStrikesTimer > 0) { state.auras.sweepingStrikesTimer -= dt; if (state.auras.sweepingStrikesTimer <= 0) state.auras.sweepingStrikesCharges = 0; }
 
-  document.getElementById("analyzer-wasted-procs").innerText = state.wastedProcsCount;
-  document.getElementById("analyzer-ms-held").innerText = state.msHeldTime.toFixed(1) + "s";
-  document.getElementById("analyzer-rend-down").innerText = state.rendDownTime.toFixed(1) + "s";
-
-  const mins = Math.floor(state.combatTime / 60).toString().padStart(2, '0');
-  const secs = Math.floor(state.combatTime % 60).toString().padStart(2, '0');
-  document.getElementById("combat-clock").innerText = `${mins}:${secs}`;
-}
-
-// Game Loop
-let lastTick = performance.now();
-function gameLoop(now) {
-  const dt = (now - lastTick) / 1000;
-  lastTick = now;
-
-  if (state.combatActive && !state.combatPaused) {
-    state.combatTime += dt;
-    if (state.rage >= 99.5) state.rageCapTime += dt;
-    if (state.auras.rendDot > 0) state.rendUptimeAccum += dt;
-    else state.rendDownTime += dt;
-    
-    if (state.cds.MS <= 0 && state.rage >= SPELL_DB.MS.rageCost && !state.channeling && state.targetHP > 20 && state.targetCount === 1) {
-      state.msHeldTime += dt;
-    }
-
-    if (state.gcdRemaining <= 0 && !state.channeling) state.gcdIdleAccum += dt;
-
-    // Sweeping Strikes 30s Expiration
-    if (state.auras.sweepingStrikesTimer > 0) {
-      state.auras.sweepingStrikesTimer -= dt;
-      if (state.auras.sweepingStrikesTimer <= 0) {
-        state.auras.sweepingStrikesCharges = 0;
-      }
-    }
-
-    // Bladestorm Channeling Tick
-    if (state.channeling) {
-      state.channeling.remaining -= dt;
-      const nowTime = new Date().toLocaleTimeString();
-
-      dispatchTalentHook("onChannelTick", state.channeling, state, dt, (title, type, desc) => addLogEntry(nowTime, title, type, desc));
-
-      if (state.channeling.remaining <= 0) {
-        state.channeling = null;
-        state.gcdBecameReadyAt = performance.now();
-        addLogEntry(nowTime, "Bladestorm Finalizado", "channel", currentLang === "en" ? "Channeling completed" : "Canalización completada");
-      }
-    }
-
-    if (state.gcdRemaining > 0) {
-      state.gcdRemaining = Math.max(0, state.gcdRemaining - dt);
-      if (state.gcdRemaining <= 0) {
-        state.gcdBecameReadyAt = performance.now();
-      }
-    }
-
-    if (state.gcdRemaining <= 0 && !state.channeling && state.queuedSpell) {
-      const spellToExecute = state.queuedSpell.spell;
-      const wasSQW = state.queuedSpell.queuedInSQW;
-      state.queuedSpell = null;
-      processSpellCast(spellToExecute, wasSQW);
-    }
-
-    for (let key in state.cds) {
-      if (state.cds[key] > 0) state.cds[key] = Math.max(0, state.cds[key] - dt);
-    }
-
-    if (state.opCharges < 2) {
-      state.opRecharge -= dt;
-      if (state.opRecharge <= 0) {
-        state.opCharges++;
-        state.opRecharge = state.opCharges < 2 ? getSpellCDMax("OP") : 0;
-      }
-    }
-
-    if (state.auras.colossusSmash > 0) state.auras.colossusSmash = Math.max(0, state.auras.colossusSmash - dt);
-    if (state.auras.rendDot > 0) state.auras.rendDot = Math.max(0, state.auras.rendDot - dt);
-    if (state.auras.avatar > 0) state.auras.avatar = Math.max(0, state.auras.avatar - dt);
-
-    // Auto-Attacks
-    if (!state.channeling) {
-      state.swingTimer -= dt;
-      if (state.swingTimer <= 0) {
-        state.swingTimer = state.swingTotal;
-        const isCrit = Math.random() < (state.stats.crit / 100);
-        const rageGained = isCrit ? 31.3 : 11.8;
+      if (state.channeling && state.channeling.name === "Bladestorm") {
+        state.channeling.remaining -= dt;
         
-        state.rage = Math.min(100, state.rage + rageGained);
-        triggerFCT(`+${Math.round(rageGained)} ${t("rageLabel")}`, isCrit ? "#ef4444" : "#94a3b8");
-        dispatchTalentHook("onAutoAttack", state, isCrit);
-        
-        if (Math.random() < 0.16) {
-          if (state.auras.heroicStrike) {
-            state.wastedProcsCount++;
+        if (state.channeling.lastTickTime - state.channeling.remaining >= 0.8) {
+          state.channeling.lastTickTime = state.channeling.remaining;
+          state.rage = Math.min(100, state.rage + 5);
+          spawn3DImpactFX(0xa855f7);
+        }
+
+        if (state.activeTalents.has("unhinged")) {
+          const pctRemaining = state.channeling.remaining / state.channeling.total;
+          if (pctRemaining <= 0.66 && state.channeling.unhingedDone === 0) {
+            state.channeling.unhingedDone = 1;
+            spawn3DImpactFX(0xc084fc);
+            triggerFCT("Unhinged MS", "#c084fc");
+            playAudioFeedback("good");
+          } else if (pctRemaining <= 0.33 && state.channeling.unhingedDone === 1) {
+            state.channeling.unhingedDone = 2;
+            spawn3DImpactFX(0xc084fc);
+            triggerFCT("Unhinged MS", "#c084fc");
+            playAudioFeedback("good");
           }
-          state.auras.heroicStrike = true;
-          playAudioFeedback("proc");
-          triggerFCT("¡HEROIC STRIKE!", "#38bdf8");
+        }
+
+        if (state.channeling.remaining <= 0) {
+          state.channeling = null;
+          state.gcdBecameReadyAt = performance.now();
+        }
+      }
+
+      if (state.gcdRemaining > 0) {
+        state.gcdRemaining = Math.max(0, state.gcdRemaining - dt);
+        if (state.gcdRemaining <= 0) state.gcdBecameReadyAt = performance.now();
+      }
+
+      if (state.gcdRemaining <= 0 && !state.channeling && state.queuedSpell) {
+        const sp = state.queuedSpell.spell;
+        const wasSQW = state.queuedSpell.queuedInSQW;
+        state.queuedSpell = null;
+        processSpellCast(sp, wasSQW);
+      }
+
+      for (let k in state.cds) { if (state.cds[k] > 0) state.cds[k] = Math.max(0, state.cds[k] - dt); }
+      if (state.opCharges < 2) { state.opRecharge -= dt; if (state.opRecharge <= 0) { state.opCharges++; state.opRecharge = state.opCharges < 2 ? getSpellCDMax("OP") : 0; } }
+
+      if (state.auras.colossusSmash > 0) state.auras.colossusSmash = Math.max(0, state.auras.colossusSmash - dt);
+      if (state.auras.rendDot > 0) state.auras.rendDot = Math.max(0, state.auras.rendDot - dt);
+      if (state.auras.avatar > 0) state.auras.avatar = Math.max(0, state.auras.avatar - dt);
+
+      if (!state.channeling) {
+        state.swingTimer -= dt;
+        if (state.swingTimer <= 0) {
+          state.swingTimer = state.swingTotal;
+          const isCrit = Math.random() < (state.stats.crit / 100);
+          state.rage = Math.min(100, state.rage + (isCrit ? 31.3 : 11.8));
+
+          if (state.activeTalents.has("fatality")) {
+            state.auras.fatalityStacks = Math.min(10, state.auras.fatalityStacks + 1);
+          }
+
+          if (state.activeTalents.has("sudden_death") && Math.random() < 0.16) {
+            if (state.auras.suddenDeath >= 2) state.wastedProcsCount++;
+            else {
+              state.auras.suddenDeath++;
+              state.procTimestamps.suddenDeath = performance.now();
+              playAudioFeedback("proc");
+            }
+          }
+          if (Math.random() < 0.15) {
+            state.auras.heroicStrike = true;
+            state.procTimestamps.heroicStrike = performance.now();
+            playAudioFeedback("proc");
+          }
         }
       }
     }
+
+    const body = document.body;
+    if (state.auras.colossusSmash > 0 || state.auras.avatar > 0) body.className = isCDMEditMode ? "cdm-edit-mode vignette-burst" : "vignette-burst";
+    else if (state.targetHP <= 20) body.className = isCDMEditMode ? "cdm-edit-mode vignette-execute" : "vignette-execute";
+    else if (state.auras.suddenDeath > 0 || state.auras.heroicStrike) body.className = isCDMEditMode ? "cdm-edit-mode vignette-proc" : "vignette-proc";
+    else body.className = isCDMEditMode ? "cdm-edit-mode" : "";
+
+    renderUI();
+    updateStatsUI();
+    renderAurasDashboard();
+  } catch (err) {
+    console.error("Combat loop rendering error:", err);
   }
 
-  // Peripheral Screen Vignettes
-  const body = document.body;
-  if (state.auras.colossusSmash > 0 || state.auras.avatar > 0) {
-    body.className = "vignette-burst";
-  } else if (state.targetHP <= 20) {
-    body.className = "vignette-execute";
-  } else if (state.auras.suddenDeath || state.auras.heroicStrike) {
-    body.className = "vignette-proc";
-  } else {
-    body.className = "";
-  }
-
-  renderUI();
-  updateAnalyzerUI();
   requestAnimationFrame(gameLoop);
 }
 
 function renderUI() {
-  document.getElementById("rage-bar").style.width = state.rage + "%";
-  document.getElementById("rage-text").innerText = `${t("rageLabel")}: ${Math.round(state.rage)} / 100`;
+  const ragePct = state.rage;
+  const isVertical = currentLayout.resource?.orientation === "vertical";
+  const rBar = document.getElementById("rage-bar");
+  if (rBar) {
+    if (isVertical) { rBar.style.height = ragePct + "%"; rBar.style.width = "100%"; }
+    else { rBar.style.width = ragePct + "%"; rBar.style.height = "100%"; }
+  }
+  setText("rage-text", `${t("rageLabel")}: ${Math.round(state.rage)}`);
 
-  const channelWrapper = document.getElementById("channel-wrapper");
-  const channelBar = document.getElementById("channel-bar");
-  const channelText = document.getElementById("channel-text");
+  const chWrap = document.getElementById("channel-wrapper");
+  const chBar = document.getElementById("channel-bar");
   if (state.channeling) {
-    channelWrapper.style.display = "flex";
-    const chPct = (state.channeling.remaining / state.channeling.total) * 100;
-    channelBar.style.width = chPct + "%";
-    const bsKey = userSlots.find(s=>s.spellId==='BS')?.key || '5';
-    channelText.innerText = `${t("channelingBS")} ${state.channeling.remaining.toFixed(1)}s (${currentLang === "en" ? "Press" : "Presiona"} ${bsKey} ${t("channelCancelHint")})`;
+    if (chWrap) chWrap.style.display = "flex";
+    const pct = (state.channeling.remaining / state.channeling.total) * 100;
+    if (chBar) chBar.style.width = pct + "%";
+    const bsKey = customKeybinds["BS"] || "5";
+    setText("channel-text", `${t("channelingBS")} ${state.channeling.remaining.toFixed(1)}s (${bsKey} ${t("cancelHint")})`);
   } else {
-    channelWrapper.style.display = "none";
+    if (chWrap) chWrap.style.display = "none";
   }
 
-  const gcdPct = (state.gcdRemaining / state.gcdTotal) * 100;
-  document.getElementById("gcd-bar").style.width = gcdPct + "%";
+  const mins = Math.floor(state.combatTime / 60).toString().padStart(2, '0');
+  const secs = Math.floor(state.combatTime % 60).toString().padStart(2, '0');
+  setText("combat-clock", `${mins}:${secs}`);
+  setText("combat-status-badge", !state.combatActive ? "Idle" : state.combatPaused ? t("btnPause") : "Combat");
 
-  const swingPct = state.combatActive ? ((state.swingTotal - state.swingTimer) / state.swingTotal) * 100 : 100;
-  document.getElementById("swing-bar").style.width = swingPct + "%";
+  const idealId = evaluateAPL();
 
-  // Auras
-  const aurasList = document.getElementById("auras-list");
-  aurasList.innerHTML = "";
-  if (state.queuedSpell) aurasList.innerHTML += `<div class="aura-pill aura-queue">${t("auraQueue")}: ${state.queuedSpell.spell.name}</div>`;
-  if (state.channeling) aurasList.innerHTML += `<div class="aura-pill aura-channel">${t("auraChannel")} ${state.channeling.name}</div>`;
-  if (state.auras.sweepingStrikesCharges > 0) aurasList.innerHTML += `<div class="aura-pill aura-ss">Sweeping Strikes x${state.auras.sweepingStrikesCharges} (${state.auras.sweepingStrikesTimer.toFixed(1)}s)</div>`;
-  if (state.auras.colossusSmash > 0) aurasList.innerHTML += `<div class="aura-pill aura-active">Colossus Smash: ${state.auras.colossusSmash.toFixed(1)}s</div>`;
-  if (state.auras.rendDot > 0) aurasList.innerHTML += `<div class="aura-pill aura-active">Rend (${state.auras.rendDot.toFixed(1)}s)</div>`;
-  if (state.auras.avatar > 0) aurasList.innerHTML += `<div class="aura-pill aura-active">Avatar: ${state.auras.avatar.toFixed(1)}s</div>`;
-  if (state.auras.overpowerBuff > 0) aurasList.innerHTML += `<div class="aura-pill aura-active">Overpower Buff x${state.auras.overpowerBuff}</div>`;
-  if (state.auras.imminentDemise > 0) aurasList.innerHTML += `<div class="aura-pill aura-demise">Imminent Demise x${state.auras.imminentDemise}</div>`;
-  
-  if (state.auras.executionersPrecision > 0) {
-    const isReady = state.auras.executionersPrecision === 2;
-    const readyTag = isReady ? (currentLang === "en" ? "(MS Ready!)" : "(¡MS Listo!)") : "";
-    aurasList.innerHTML += `<div class="aura-pill aura-precision ${isReady ? 'ready' : ''}">Executioner's Precision x${state.auras.executionersPrecision} ${readyTag}</div>`;
-  }
+  ["cdmPrimary", "cdmSecondary"].forEach(panelId => {
+    const slotList = (currentLayout[panelId] && currentLayout[panelId].slots) ? currentLayout[panelId].slots : DEFAULT_CDM_LAYOUT[panelId].slots;
+    slotList.forEach((spellId, idx) => {
+      let effId = spellId;
+      if (spellId === "SLAM" && state.auras.heroicStrike) effId = "HS";
+      const spell = SPELL_DB[effId];
+      if (!spell) return;
 
-  if (state.auras.suddenDeath) aurasList.innerHTML += `<div class="aura-pill aura-proc">${t("auraProcSD")}</div>`;
-  if (state.auras.heroicStrike) aurasList.innerHTML += `<div class="aura-pill aura-proc" style="background:#0284c7; border-color:#38bdf8;">${t("auraProcHS")}</div>`;
+      const slotEl = document.getElementById(`slot-${panelId}-${idx}`);
+      const iconEl = document.getElementById(`icon-${panelId}-${idx}`);
+      const radialEl = document.getElementById(`radial-${panelId}-${idx}`);
+      const numEl = document.getElementById(`num-${panelId}-${idx}`);
+      const chargeEl = document.getElementById(`charge-${panelId}-${idx}`);
+      const bindBadge = document.getElementById(`bind-badge-${panelId}-${idx}`);
+      if (!slotEl || !radialEl || !numEl) return;
 
-  // Action Bar Glow / Cooldowns
-  const idealSpellId = evaluateAPL();
+      if (iconEl && iconEl.dataset.spell !== effId) {
+        iconEl.src = spell.icon;
+        iconEl.dataset.spell = effId;
+      }
 
-  userSlots.forEach((slot, idx) => {
-    let effectiveSpellId = slot.spellId;
-    if (slot.spellId === "SLAM" && state.auras.heroicStrike) {
-      effectiveSpellId = "HS";
-    }
+      if (bindBadge) {
+        bindBadge.innerText = customKeybinds[spellId] || spell.defaultKey;
+      }
 
-    const spell = SPELL_DB[effectiveSpellId];
-    if (!spell) return;
+      slotEl.classList.remove("glow", "proc-heroic", "proc-sd", "channel-locked", "channel-canceler", "queued", "out-of-range");
+      if (state.enforceRange && !state.inMeleeRange && effId !== "AVATAR") slotEl.classList.add("out-of-range");
 
-    const slotEl = document.getElementById(`slot-dom-${idx}`);
-    const nameEl = document.getElementById(`name-dom-${idx}`);
-    const radialEl = document.getElementById(`radial-dom-${idx}`);
-    const numEl = document.getElementById(`num-dom-${idx}`);
-    const chargeEl = document.getElementById(`charge-dom-${idx}`);
-
-    if (!slotEl || !radialEl || !numEl) return;
-
-    if (nameEl) nameEl.innerText = spell.name;
-
-    slotEl.classList.remove("glow", "proc-heroic", "channel-locked", "channel-canceler", "queued");
-
-    if (state.queuedSpell && state.queuedSpell.spell.id === spell.id) {
-      slotEl.classList.add("queued");
-    } else if (state.channeling) {
-      if (spell.id === "BS") {
-        slotEl.classList.add("channel-canceler");
+      if (state.queuedSpell && state.queuedSpell.spell.id === spell.id) slotEl.classList.add("queued");
+      else if (state.channeling) {
+        if (spell.id === "BS") slotEl.classList.add("channel-canceler");
+        else slotEl.classList.add("channel-locked");
       } else {
-        slotEl.classList.add("channel-locked");
+        if (effId === idealId || (spellId === "SLAM" && idealId === "HS")) slotEl.classList.add("glow");
+        else if (effId === "HS") slotEl.classList.add("proc-heroic");
+        else if (effId === "EXECUTE" && state.auras.suddenDeath > 0) slotEl.classList.add("proc-sd");
       }
-    } else {
-      if (effectiveSpellId === idealSpellId || (slot.spellId === "SLAM" && idealSpellId === "HS")) {
-        slotEl.classList.add("glow");
-      } else if (effectiveSpellId === "HS") {
-        slotEl.classList.add("proc-heroic");
-      }
-    }
 
-    let cdRemaining = 0;
-    let maxDuration = getSpellCDMax(spell.id) || 1;
+      let cdRem = 0, maxDur = getSpellCDMax(spell.id) || 1;
+      if (spell.id === "EXECUTE") {
+        if (chargeEl) { chargeEl.className = "charges sd-badge"; chargeEl.innerText = state.auras.suddenDeath > 0 ? `x${state.auras.suddenDeath}` : ""; }
+      } else if (spell.id === "SS") {
+        if (chargeEl) { chargeEl.className = "charges ss-badge"; chargeEl.innerText = state.auras.sweepingStrikesCharges > 0 ? state.auras.sweepingStrikesCharges : ""; }
+        cdRem = state.cds.SS || 0; maxDur = getSpellCDMax("SS");
+      } else if (spell.id === "OP") {
+        if (chargeEl) { chargeEl.className = "charges"; chargeEl.innerText = state.opCharges; }
+        if (state.opCharges === 0) { cdRem = state.opRecharge; maxDur = getSpellCDMax("OP"); }
+      } else {
+        if (chargeEl) { chargeEl.className = "charges"; chargeEl.innerText = ""; }
+        if (state.cds[spell.id]) { cdRem = state.cds[spell.id]; maxDur = getSpellCDMax(spell.id); }
+      }
 
-    if (spell.id === "SS") {
-      if (chargeEl) {
-        chargeEl.className = "charges ss-badge";
-        chargeEl.innerText = state.auras.sweepingStrikesCharges > 0 ? state.auras.sweepingStrikesCharges : "";
+      if (cdRem > 0) {
+        radialEl.style.background = `conic-gradient(rgba(0, 0, 0, 0.78) ${(cdRem / maxDur) * 360}deg, transparent ${(cdRem / maxDur) * 360}deg)`;
+        numEl.innerText = cdRem > 2 ? Math.ceil(cdRem) : cdRem.toFixed(1);
+      } else if (spell.triggersGCD && state.gcdRemaining > 0 && !state.channeling) {
+        radialEl.style.background = `conic-gradient(rgba(0, 0, 0, 0.72) ${(state.gcdRemaining / state.gcdTotal) * 360}deg, transparent ${(state.gcdRemaining / state.gcdTotal) * 360}deg)`;
+        numEl.innerText = "";
+      } else {
+        radialEl.style.background = "transparent"; numEl.innerText = "";
       }
-      cdRemaining = state.cds.SS || 0;
-      maxDuration = getSpellCDMax("SS");
-    } else if (spell.id === "OP") {
-      if (chargeEl) {
-        chargeEl.className = "charges";
-        chargeEl.innerText = state.opCharges;
-      }
-      if (state.opCharges === 0) {
-        cdRemaining = state.opRecharge;
-        maxDuration = getSpellCDMax("OP");
-      }
-    } else {
-      if (chargeEl) {
-        chargeEl.className = "charges";
-        chargeEl.innerText = "";
-      }
-      if (state.cds[spell.id]) {
-        cdRemaining = state.cds[spell.id];
-        maxDuration = getSpellCDMax(spell.id);
-      }
-    }
-
-    if (cdRemaining > 0) {
-      const fraction = cdRemaining / maxDuration;
-      const deg = fraction * 360;
-      radialEl.style.background = `conic-gradient(rgba(0, 0, 0, 0.78) ${deg}deg, transparent ${deg}deg)`;
-      numEl.innerText = cdRemaining > 2 ? Math.ceil(cdRemaining) : cdRemaining.toFixed(1);
-    } else if (spell.triggersGCD && state.gcdRemaining > 0 && !state.channeling) {
-      const gcdFraction = state.gcdRemaining / state.gcdTotal;
-      const deg = gcdFraction * 360;
-      radialEl.style.background = `conic-gradient(rgba(0, 0, 0, 0.72) ${deg}deg, transparent ${deg}deg)`;
-      numEl.innerText = "";
-    } else {
-      radialEl.style.background = "transparent";
-      numEl.innerText = "";
-    }
+    });
   });
 }
 
-// Global Keyboard Handler
-window.addEventListener("keydown", (e) => {
-  if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT" || isEditMode) return;
-  const key = e.key.toUpperCase();
-  triggerCast(key);
-});
+function updateTargetScenarioText() {
+  const countText = state.targetCount === 1 ? t("optEnemies1") : 
+                    state.targetCount === 2 ? t("optEnemies2") : 
+                    t("optEnemies3");
+  const hpText = state.targetHP <= 20 ? t("optHp20") : t("optHp100");
+  setText("target-scenario-text", `${countText} (${hpText})`);
+}
 
-// Initialization
-recalculateDerivedStats();
-setLanguage("en");
-loadPresetBuild("st_1t");
-buildActionBarUI();
-requestAnimationFrame(gameLoop);
+function updateCombatScenario() {
+  const tSel = document.getElementById("target-count-select");
+  if (tSel) state.targetCount = parseInt(tSel.value) || 1;
+  const hpSel = document.getElementById("dummy-hp");
+  if (hpSel) state.targetHP = parseInt(hpSel.value) || 100;
+  resetCombat();
+}
+
+function toggleRangeEnforcement(val) {
+  state.enforceRange = (val === "on");
+  if (!state.enforceRange) state.inMeleeRange = true;
+}
+
+function togglePauseCombat() {
+  if (!state.combatActive) return;
+  state.combatPaused = !state.combatPaused;
+  const btn = document.getElementById("btn-pause-toggle");
+  if (btn) {
+    btn.innerText = state.combatPaused ? t("btnResume") : t("btnPause");
+    btn.classList.toggle("btn-active", state.combatPaused);
+  }
+  updateHUD(state.combatPaused ? t("hudFeedbackPaused") : t("hudFeedbackResumed"), "#eab308");
+}
+
+function updatePing(val) { state.simulatedPing = Math.max(0, parseInt(val) || 0); }
+function updateSQW(val) { state.spellQueueWindow = Math.max(0, (parseInt(val) || 400) / 1000); }
+function updateGraceWindow(val) { state.procGraceWindow = Math.max(0, (parseInt(val) || 400) / 1000); }
+
+function resetCombat() {
+  const tSel = document.getElementById("target-count-select");
+  if (tSel) state.targetCount = parseInt(tSel.value) || 1;
+  const hpSel = document.getElementById("dummy-hp");
+  if (hpSel) state.targetHP = parseInt(hpSel.value) || 100;
+
+  state.rage = 40; state.gcdRemaining = 0; state.gcdBecameReadyAt = performance.now();
+  state.swingTimer = state.swingTotal; state.channeling = null; state.queuedSpell = null;
+  state.cds = { CS: 0, MS: 0, CLEAVE: 0, BS: 0, SS: 0, AVATAR: 0 };
+  state.opCharges = 2; state.opRecharge = 0; state.procTimestamps = { suddenDeath: 0, heroicStrike: 0 };
+  state.auras = { colossusSmash: 0, rendDot: 0, avatar: 0, overpowerBuff: 0, fatalityStacks: 0, executionersPrecision: 0, sweepingStrikesCharges: 0, sweepingStrikesTimer: 0, slayerDebuff: 0, slayerTimer: 0, suddenDeath: 0, heroicStrike: false };
+  state.score = 0; state.combo = 0; state.totalCasts = 0; state.perfectCasts = 0;
+  state.combatActive = false; state.combatPaused = false; state.combatTime = 0;
+  state.rageCapTime = 0; state.rendUptimeAccum = 0; state.gcdIdleAccum = 0; state.successfulCasts = 0;
+  state.wastedProcsCount = 0; state.msHeldTime = 0; state.rendDownTime = 0; state.wastedPrecisionStacks = 0;
+  state.mistakeOccurrences = {}; state.totalMistakes = 0; state.allCastLogs = [];
+  
+  player2D = { x: 0, z: 0.8 };
+  if (playerMesh3D) playerMesh3D.position.set(0, 0, 0.8);
+
+  const tList = document.getElementById("results-ticker-list");
+  if (tList) tList.innerHTML = "";
+  const lCont = document.getElementById("log-container");
+  if (lCont) lCont.innerHTML = "";
+  const chW = document.getElementById("channel-wrapper");
+  if (chW) chW.style.display = "none";
+
+  updateTargetScenarioText();
+  updateHUD(t("hudFeedbackStart"), "#94a3b8");
+  updateScoreUI(0, 0, "-");
+}
+
+function clearTimelineFilter() {
+  state.activeTimelineFilter = null;
+  const btn = document.getElementById("btn-clear-filter");
+  if (btn) btn.style.display = "none";
+  renderTimelineView();
+}
+
+// Global Initialization
+function launchApplication() {
+  try {
+    loadStoredCDM();
+  } catch (e) {
+    currentLayout = JSON.parse(JSON.stringify(DEFAULT_CDM_LAYOUT));
+  }
+
+  try {
+    init3DArena();
+  } catch (e) {
+    console.error("3D Init Exception:", e);
+  }
+
+  try {
+    recalculateDerivedStats();
+    setLanguage("en");
+    renderAllCDMPanels();
+    setupCDMDragAndDrop();
+  } catch (e) {
+    console.error("UI Init Exception:", e);
+  }
+
+  requestAnimationFrame(gameLoop);
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", launchApplication);
+} else {
+  launchApplication();
+}
 </script>
 </body>
 </html>
