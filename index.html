@@ -1911,34 +1911,41 @@ function evaluateAPL(ignoreRecentProcs = false) {
     if (sd > 0) return "EXECUTE";
     if (state.cds.MS <= 0 && state.rage >= SPELL_DB.MS.rageCost) return "MS";
   } else if (isExecute) {
-    // APL estricto de SimulationCraft (Slayer Execute)
-    if (enemies >= 2 && state.cds.SS <= 0 && state.auras.sweepingStrikesCharges <= 0) return "SS";
-    if (state.auras.rendDot < 2 && state.cds.CLEAVE <= 0 && state.rage >= SPELL_DB.CLEAVE.rageCost) return "CLEAVE";
-    if ((state.auras.colossusSmash > 0 || (state.cds.CS < 10 && state.cds.CS > state.gcdTotal)) && state.cds.AVATAR <= 0) return "AVATAR";
-    if (state.cds.CS <= 0) return "CS";
-    if (hs && state.rage >= SPELL_DB.HS.rageCost) return "HS";
-    if ((state.auras.colossusSmash > 0 || state.auras.avatar > 0 || state.cds.CS > 25 || state.auras.executionersPrecision === 2) && state.cds.BS <= 0) return "BS";
-    if (state.auras.executionersPrecision === 2 && state.cds.MS <= 0 && state.rage >= (state.battlelordCostReduction ? Math.max(0, SPELL_DB.MS.rageCost - 10) : SPELL_DB.MS.rageCost)) return "MS";
-    if (sd > 0 && state.auras.executionerStacks > 0) return "EXECUTE";
-    if (state.rage > 40) return "EXECUTE";
-    if (state.opCharges > 0) return "OP";
-    if (sd > 0) return "EXECUTE";
-    if (state.rage >= 20) return "EXECUTE";
+    // APL estricto de SimulationCraft (Slayer Execute)[cite: 2]
+    if (enemies >= 2 && state.cds.SS <= 0 && state.auras.sweepingStrikesCharges <= 0) return "SS";[cite: 2]
+    if (state.auras.rendDot < 2 && state.cds.CLEAVE <= 0 && state.rage >= SPELL_DB.CLEAVE.rageCost) return "CLEAVE";[cite: 2]
+    if ((state.auras.colossusSmash > 0 || (state.cds.CS < 10 && state.cds.CS > state.gcdTotal)) && state.cds.AVATAR <= 0) return "AVATAR";[cite: 2]
+    if (state.cds.CS <= 0) return "CS";[cite: 2]
+    if (hs && state.rage >= SPELL_DB.HS.rageCost) return "HS";[cite: 2]
+    // Regla SimC / Wowhead: Gastar Sudden Death antes de Bladestorm[cite: 2]
+    if (sd > 0 && state.cds.BS <= 0 && (state.auras.colossusSmash > 0 || state.auras.avatar > 0)) return "EXECUTE";
+    if ((state.auras.colossusSmash > 0 || state.auras.avatar > 0 || state.cds.CS > 25 || state.auras.executionersPrecision === 2) && state.cds.BS <= 0) return "BS";[cite: 2]
+    if (state.auras.executionersPrecision === 2 && state.cds.MS <= 0 && state.rage >= (state.battlelordCostReduction ? Math.max(0, SPELL_DB.MS.rageCost - 10) : SPELL_DB.MS.rageCost)) return "MS";[cite: 2]
+    if (sd > 0 && state.auras.executionerStacks > 0) return "EXECUTE";[cite: 2]
+    if (state.rage > 40) return "EXECUTE";[cite: 2]
+    if (state.opCharges > 0) return "OP";[cite: 2]
+    if (sd > 0) return "EXECUTE";[cite: 2]
+    if (state.rage >= 20) return "EXECUTE";[cite: 2]
   } else {
-    if (enemies === 2 && state.cds.SS <= 0 && state.auras.sweepingStrikesCharges <= 0) return "SS";
-    if (state.auras.rendDot <= state.gcdTotal && state.cds.CLEAVE <= 0 && state.rage >= SPELL_DB.CLEAVE.rageCost) return "CLEAVE";
-    if (state.cds.CS < 2 && state.auras.rendDot <= 10 && state.cds.CLEAVE <= 0 && state.rage >= SPELL_DB.CLEAVE.rageCost) return "CLEAVE";
-    if ((state.auras.colossusSmash > 0 || (state.cds.CS < 10 && state.cds.CS > state.gcdTotal)) && state.cds.AVATAR <= 0) return "AVATAR";
+    // APL estricto de SimulationCraft (Slayer Single Target)[cite: 2]
+    if (enemies === 2 && state.cds.SS <= 0 && state.auras.sweepingStrikesCharges <= 0) return "SS";[cite: 2]
+    if (state.auras.rendDot <= state.gcdTotal && state.cds.CLEAVE <= 0 && state.rage >= SPELL_DB.CLEAVE.rageCost) return "CLEAVE";[cite: 2]
+    if (state.cds.CS < 2 && state.auras.rendDot <= 10 && state.cds.CLEAVE <= 0 && state.rage >= SPELL_DB.CLEAVE.rageCost) return "CLEAVE";[cite: 2]
+    if ((state.auras.colossusSmash > 0 || (state.cds.CS < 10 && state.cds.CS > state.gcdTotal)) && state.cds.AVATAR <= 0) return "AVATAR";[cite: 2]
     if (sd >= 2 && state.cds.CS > 0 && state.cds.CS <= state.gcdTotal) return "EXECUTE";
-    if (state.cds.CS <= 0) return "CS";
-    if ((state.auras.colossusSmash > 0 || state.auras.avatar > 0 || state.cds.CS > 25) && state.cds.BS <= 0) return "BS";
-    if (hs && state.rage >= SPELL_DB.HS.rageCost) return "HS";
-    if (state.cds.MS <= 0 && state.rage >= SPELL_DB.MS.rageCost) return "MS";
+    if (state.cds.CS <= 0) return "CS";[cite: 2]
+
+    // REGLA SIMC / WOWHEAD: Gastar Sudden Death antes de Bladestorm[cite: 2]
+    if (sd > 0 && state.cds.BS <= 0 && (state.auras.colossusSmash > 0 || state.auras.avatar > 0)) return "EXECUTE";
+
+    if ((state.auras.colossusSmash > 0 || state.auras.avatar > 0 || state.cds.CS > 25) && state.cds.BS <= 0) return "BS";[cite: 2]
+    if (hs && state.rage >= SPELL_DB.HS.rageCost) return "HS";[cite: 2]
+    if (state.cds.MS <= 0 && state.rage >= SPELL_DB.MS.rageCost) return "MS";[cite: 2]
     if (sd >= 2) return "EXECUTE";
-    if (state.opCharges > 0) return "OP";
+    if (state.opCharges > 0) return "OP";[cite: 2]
     if (sd > 0) return "EXECUTE";
-    if (enemies === 2 && state.cds.CLEAVE <= 0 && state.rage >= SPELL_DB.CLEAVE.rageCost) return "CLEAVE";
-    if (state.auras.rendDot <= 4.5 && state.cds.CLEAVE <= 0 && state.rage >= SPELL_DB.CLEAVE.rageCost) return "CLEAVE";
+    if (enemies === 2 && state.cds.CLEAVE <= 0 && state.rage >= SPELL_DB.CLEAVE.rageCost) return "CLEAVE";[cite: 2]
+    if (state.auras.rendDot <= 4.5 && state.cds.CLEAVE <= 0 && state.rage >= SPELL_DB.CLEAVE.rageCost) return "CLEAVE";[cite: 2]
     if (state.rage >= 40) return "SLAM";
   }
   return null;
